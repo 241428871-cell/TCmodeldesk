@@ -113,11 +113,14 @@ def _asar_path(executable):
     for archive in candidates:
         if archive.is_file() and not archive.is_symlink():
             return archive
-    raise ValueError('无法确认已安装 DSH 的 app.asar')
+    from cli_sources import dsh_web_package
+    return dsh_web_package(executable)
 
 
 def _standard_sources(archive):
     """Raw bytes of the shipped Standard declaration and web overlay."""
+    if Path(archive).is_dir():
+        return (Path(archive) / 'presets/standard.patch.yml').read_bytes(), (Path(archive) / 'cordis.patch.yml').read_bytes()
     return _asar_read(archive, STANDARD_ENTRY), _asar_read(archive, WEB_ENTRY)
 
 
@@ -154,7 +157,11 @@ def content_revision(preset, executable=None):
     """
     try:
         preset = str(preset or 'standard')
-        archive = _asar_path(executable or EXECUTABLE)
+        archive = _asar_path(executable or runtime_paths.dsh_executable() or runtime_paths.UNSET)
+        if archive.is_dir():
+            standard_bytes, web_bytes = _standard_sources(archive)
+            preset_bytes = NATIVE.read_bytes() if preset == 'native' else standard_bytes
+            return _revision(preset_bytes, web_bytes)
         stat = archive.stat()
         native_stat = NATIVE.stat() if NATIVE.is_file() else None
         memo_key = (preset, str(archive), stat.st_mtime_ns, stat.st_size,
@@ -199,7 +206,7 @@ def load(model, executable, subagent=False, child_config=None):
         source = str(NATIVE)
     else:
         preset_bytes = standard_bytes
-        source = str(archive) + '/' + STANDARD_ENTRY
+        source = str(archive / 'presets/standard.patch.yml') if archive.is_dir() else str(archive) + '/' + STANDARD_ENTRY
     text = preset_bytes.decode('utf-8')
     web_text = web_bytes.decode('utf-8')
     declaration = definition(text, preset)

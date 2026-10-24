@@ -59,8 +59,17 @@ class Account(TypedDict, total=False):
 _LOCK: Final = Lock()
 _CATALOGS: Final[dict[str, Catalog]] = {}
 _ACCOUNTS: Final[dict[str, Account]] = {}
+_GENERATIONS: Final[dict[str, int]] = {}
 _PROVIDERS: Final = {'claude_cli': 'claude', 'codex_cli': 'codex'}
 _EFFORTS: Final = {'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'}
+
+
+def invalidate(provider: str) -> None:
+    """Discard metadata from a previous backend, including in-flight refreshes."""
+    with _LOCK:
+        _GENERATIONS[provider] = _GENERATIONS.get(provider, 0) + 1
+        _CATALOGS.pop(provider, None)
+        _ACCOUNTS.pop(provider, None)
 
 
 def _now() -> str:
@@ -159,6 +168,8 @@ def catalog(provider: str) -> Catalog:
     """Explicitly discover native models; no generation, credentials or sessions."""
     if provider not in _PROVIDERS:
         raise ProviderError('此服务类型请通过其 API 模型列表读取')
+    with _LOCK:
+        generation = _GENERATIONS.get(provider, 0)
     source = 'claude-sdk-control/list_models' if provider == 'claude_cli' else 'codex-app-server/model/list'
     try:
         models = _claude_models() if provider == 'claude_cli' else _codex_models()
@@ -173,7 +184,11 @@ def catalog(provider: str) -> Catalog:
                   'live': False, 'error': str(error), 'message': str(error),
                   'stale': bool(catalog_snapshot(provider).get('models'))}
     with _LOCK:
-        _CATALOGS[provider] = result
+        if generation == _GENERATIONS.get(provider, 0):
+            _CATALOGS[provider] = result
+        else:
+            return {'provider': provider, 'models': [], 'state': 'unknown', 'live': False,
+                    'message': '执行端来源已变更，请重新读取模型列表'}
     return deepcopy(result)
 
 
@@ -303,6 +318,7 @@ def account_snapshot(provider: str, model_id: str = '', force: bool = False) -> 
     if provider not in _PROVIDERS:
         raise ProviderError('此服务尚未提供账户额度读取接口')
     with _LOCK:
+        generation = _GENERATIONS.get(provider, 0)
         cached = deepcopy(_ACCOUNTS.get(provider, {'provider': provider, 'state': 'unknown',
             'source': 'native-cli', 'windows': [], 'available': False,
             'message': '点击刷新读取当前 CLI 登录账户的额度'}))
@@ -314,5 +330,9 @@ def account_snapshot(provider: str, model_id: str = '', force: bool = False) -> 
         result = {**cached, 'state': 'error', 'message': str(error), 'error': str(error),
                   'stale': bool(cached.get('updated_at'))}
     with _LOCK:
-        _ACCOUNTS[provider] = result
+        if generation == _GENERATIONS.get(provider, 0):
+            _ACCOUNTS[provider] = result
+        else:
+            return {'provider': provider, 'state': 'unknown', 'available': False, 'windows': [],
+                    'message': '执行端来源已变更，请重新读取额度'}
     return _fresh(deepcopy(result))

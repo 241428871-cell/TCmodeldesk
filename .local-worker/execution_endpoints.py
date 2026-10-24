@@ -8,6 +8,7 @@ from pathlib import Path
 
 import execution_engines
 import model_registry as registry
+from cli_sources import backend_sources
 
 IDS = ('pi', 'dsh', 'workbuddy', 'claude_cli', 'codex_cli')
 LABELS = {**execution_engines.LABELS, 'workbuddy': 'WorkBuddy'}
@@ -43,7 +44,8 @@ def apply_preset(model, engine, controls=None):
 
 
 def defaults():
-    return {key: {'enabled': key in ('pi', 'dsh'), 'current_model': None} for key in IDS}
+    return {key: {'enabled': key in ('pi', 'dsh'), 'current_model': None,
+                  **({'cli_source': 'desktop'} if key in ('codex_cli', 'dsh') else {})} for key in IDS}
 
 
 def snapshot():
@@ -59,12 +61,15 @@ def snapshot():
             raise ValueError('执行端配置含未知执行端')
         for key, value in raw['endpoints'].items():
             if (not isinstance(value, dict) or not {'enabled', 'current_model'} <= set(value) or
-                    set(value) - {'enabled', 'current_model', 'preset'}):
+                    set(value) - {'enabled', 'current_model', 'preset', 'cli_source'}):
                 raise ValueError('执行端配置字段无效')
             if type(value['enabled']) is not bool or (value['current_model'] is not None and
                     (not isinstance(value['current_model'], str) or not value['current_model'])):
                 raise ValueError('执行端配置值无效')
-            result[key] = dict(value)
+            if 'cli_source' in value and (key not in ('codex_cli', 'dsh') or
+                                         value['cli_source'] not in ('desktop', 'standalone')):
+                raise ValueError('执行端来源无效')
+            result[key].update(value)
             if 'preset' in value:
                 result[key]['preset'] = validate_preset(value['preset'])
         return {'endpoints': result, 'readable': True, 'error': ''}
@@ -92,7 +97,31 @@ def gate(engine, model, settings, *, controls=None, automatic=False):
     return key
 
 
-def update(endpoint, body, settings):
+def update(endpoint, body, settings, *, idle_guard=None):
+    if isinstance(body, dict) and 'cli_source' in body:
+        if (endpoint not in ('codex_cli', 'dsh') or set(body) != {'cli_source'} or
+                body['cli_source'] not in ('desktop', 'standalone')):
+            raise ValueError('请选择桌面版内置或独立 CLI，并独立保存')
+        with registry.file_lock(Path(registry.HERE) / 'execution-endpoints.lock'):
+            old = snapshot()
+            if not old['readable']:
+                raise ValueError(old['error'])
+            if old['endpoints'][endpoint]['cli_source'] == body['cli_source']:
+                return {'ok': True, 'endpoint': endpoint, **old['endpoints'][endpoint]}
+            if idle_guard is None:
+                raise ValueError('切换执行端来源需要核对所有项目的执行状态')
+            idle_guard()
+            option = next(row for row in backend_sources(endpoint)['options'] if row['id'] == body['cli_source'])
+            if not option['available']:
+                raise ValueError('所选执行端未安装或路径不可用；未改变当前选择')
+            old['endpoints'][endpoint]['cli_source'] = body['cli_source']
+            registry.write_json(Path(registry.HERE) / CONFIG_NAME, {'schema': 1, 'endpoints': old['endpoints']})
+        if endpoint == 'codex_cli':
+            import provider_accounts
+            import codex_usage
+            provider_accounts.invalidate(endpoint)
+            codex_usage.CACHE = codex_usage.UsageCache()
+        return {'ok': True, 'endpoint': endpoint, **old['endpoints'][endpoint]}
     if endpoint in ('pi', 'dsh') and isinstance(body, dict) and set(body) == {'access_mode'}:
         import endpoint_access
         return endpoint_access.update(endpoint, body['access_mode'])
@@ -162,6 +191,8 @@ def public_rows(models, settings, agents=None):
         # No migration: several legacy models remain eligible until explicitly selected.
         display = selected if pref['current_model'] else enabled_models[0] if len(enabled_models) == 1 else None
         info = dict(agents.get(key, {}))
+        if key in ('codex_cli', 'dsh'):
+            info['backend_sources'] = backend_sources(key)
         if key in ('pi', 'dsh'):
             import endpoint_access
             try:

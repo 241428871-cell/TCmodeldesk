@@ -12,6 +12,7 @@
   let activeTab = 'overview';
   try{const saved=sessionStorage.getItem('model-desk.tab');if(tabNames[saved])activeTab=saved;}catch{}
   const catalogs = new Map();
+  const sourceDrafts = new Map(), sourceSaving = new Set();
   const el = id => document.getElementById(id);
   const text = value => escapeText(String(value ?? ''));
   const icon = (id,cls='i') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
@@ -339,13 +340,16 @@
   }
   function renderEngines(){
     const gate=updateGate(),rows=state.execution_endpoints?.rows||[];
-    const gateNode=el('desk-engines-gate');gateNode.textContent=rows.some(row=>row.runtime?.software_update?.can_update)?gate.reason:'';gateNode.classList.toggle('blocked',gate.blocked);
+    const gateNode=el('desk-engines-gate');gateNode.textContent=rows.some(row=>row.runtime?.backend_sources||row.runtime?.software_update?.can_update)?gate.reason.replaceAll('更新 CLI','更新 CLI 或切换来源'):'';gateNode.classList.toggle('blocked',gate.blocked);
     setMarkup(el('desk-engines-list'),rows.map(row=>{
       const ready=!!row.runtime?.ready;
       const availability=row.enabled?(ready?'已启用 · 可用':'已启用 · 不可用'):'已停用';
       const kind=row.enabled?(ready?'ready':'unavailable'):'disabled';
       const launchPolicy=row.runtime?.ui_policy==='background-only'?'后台执行 · 不唤起桌面窗口':'';
       const update=row.runtime?.software_update;
+      const backends=row.runtime?.backend_sources;
+      const selectedBackend=backends?.options.find(option=>option.id===backends.selected);
+      const backendPicker=backends?`<form class="engine-source-form" data-desk-source-form="${text(row.id)}"><label>执行端来源<select name="cli_source" aria-label="${text(row.name)}执行端来源" ${gate.blocked||sourceSaving.has(row.id)?'disabled':''}>${backends.options.map(option=>`<option value="${option.id}" ${option.id===(sourceDrafts.get(row.id)||backends.selected)?'selected':''} ${!option.available?'disabled':''}>${text(option.label)}${option.available?'':' · 未安装'}</option>`).join('')}</select></label><button type="submit" class="button secondary" ${gate.blocked||sourceSaving.has(row.id)?'disabled':''}>${sourceSaving.has(row.id)?'保存中…':'保存来源'}</button></form><p class="engine-source-path" title="${text(selectedBackend?.executable||'')}">当前使用：${text(selectedBackend?.executable||'所选来源不可用，请检查安装')}</p><p class="field-hint">保存后用于新任务与新轮次；不会更改账户、模型和费用授权。</p>`:'';
       const updateState=!update?'':update.version_status==='unavailable'?`官方版本暂不可用${update.latest?` · 上次 ${text(update.latest)}（已过期）`:''}`:update.stale?`上次官方包 ${text(update.latest||'未知')} · 已过期，请重新检查`:!update.checked?'尚未检查官方版本':update.update_available===true?`<span class="update-flag">可更新到 ${text(update.latest||'未知')}</span>`:update.update_available===false?`已是最新版 ${text(update.latest)}`:`官方包 ${text(update.latest||'未知')} · 宿主管理`;
       const source=update?({'host-app':'宿主应用包（签名状态见下方）',standalone:'独立 CLI（不依赖桌面应用）',native:'本机 CLI（安装归属需核对）'}[update.source]||'安装来源未确认'):'';
       const facts=[update?.installed?`<li>已安装 <b>${text(update.installed)}</b></li>`:row.runtime?.version?`<li>版本 <b>${text(row.runtime.version)}</b></li>`:'<li>版本未确认</li>',update?`<li>${updateState}${update.checked_at?` · 核对于 ${text(update.checked_at)}`:''}</li>`:'',source?`<li>${text(source)}</li>`:'',launchPolicy?`<li>${launchPolicy}</li>`:'',row.runtime?.access_mode?`<li>${row.runtime.access_mode==='full'?'完全访问':'项目范围'}</li>`:''].join('');
@@ -354,7 +358,7 @@
       const shared=typeof endpointFacts==='function'?endpointFacts(row):null;
       const current=shared?`<div class="engine-current"><div class="engine-model"><span class="label">${shared.native?'指定原生模型':'当前模型 · 自动路由'}</span><strong>${text(shared.name)}</strong><span class="model-code">${text(shared.modelCode)}</span></div>${shared.wallet}<div class="engine-status">${row.selection_error||(row.enabled&&row.ready&&!(row.models||[]).some(m=>m.enabled))?shared.status:''}<span>${text(shared.note)}</span></div></div>`:'';
       const updateButton=update?.can_update?`<button class="button secondary" data-desk-cli-update="${row.id}" ${gate.blocked?`disabled title="${text(gate.reason)}"`:''}>更新 CLI</button>`:'';
-      return `<div class="engine-row" data-engine-id="${text(row.id)}"><span class="engine-mark" aria-hidden="true">${({pi:'Pi',dsh:'DSH',workbuddy:'WB',claude_cli:'Cl',codex_cli:'Cx'})[row.id]||'API'}</span><div class="engine-main"><div class="engine-title"><strong>${text(row.name)}</strong><span class="stag s-${kind}"><span class="sdot s-${kind}"></span>${availability}</span></div><ul class="engine-facts">${facts}</ul>${current}${note?`<p class="engine-note">${note}</p>`:''}${update?.note?`<p class="engine-note">${text(update.note)}</p>`:''}</div><div class="engine-actions"><button type="button" class="switch-button" role="switch" aria-checked="${row.enabled}" data-desk-engine-toggle="${row.id}" aria-label="允许新任务使用${text(row.name)}"><span class="switch-track" aria-hidden="true"></span>${row.enabled?'已启用':'已停用'}</button><div class="engine-buttons"><button class="button secondary" data-desk-engine-config="${row.id}">参数设置</button>${update?`<button class="button secondary" data-desk-cli-check="${row.id}">检查更新</button>${updateButton}`:''}</div></div></div>`;
+      return `<div class="engine-row" data-engine-id="${text(row.id)}"><span class="engine-mark" aria-hidden="true">${({pi:'Pi',dsh:'DSH',workbuddy:'WB',claude_cli:'Cl',codex_cli:'Cx'})[row.id]||'API'}</span><div class="engine-main"><div class="engine-title"><strong>${text(row.name)}</strong><span class="stag s-${kind}"><span class="sdot s-${kind}"></span>${availability}</span></div><ul class="engine-facts">${facts}</ul>${backendPicker}${current}${note?`<p class="engine-note">${note}</p>`:''}${update?.note?`<p class="engine-note">${text(update.note)}</p>`:''}</div><div class="engine-actions"><button type="button" class="switch-button" role="switch" aria-checked="${row.enabled}" data-desk-engine-toggle="${row.id}" aria-label="允许新任务使用${text(row.name)}"><span class="switch-track" aria-hidden="true"></span>${row.enabled?'已启用':'已停用'}</button><div class="engine-buttons"><button class="button secondary" data-desk-engine-config="${row.id}">参数设置</button>${update?`<button class="button secondary" data-desk-cli-check="${row.id}">检查更新</button>${updateButton}`:''}</div></div></div>`;
     }).join('')||'<p class="role-empty">尚未读取执行端。</p>');
   }
 
@@ -495,8 +499,21 @@
     event.preventDefault();const buttons=[...menu.querySelectorAll('button:not(:disabled)')],index=buttons.indexOf(document.activeElement);const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();
   });
   document.addEventListener('input',event=>{if(event.target.closest('#desk-binding-form'))markInspectorDirty();});
-  document.addEventListener('change',event=>{if(event.target.closest('#desk-binding-form'))markInspectorDirty();});
+  document.addEventListener('change',event=>{
+    if(event.target.closest('#desk-binding-form'))markInspectorDirty();
+    const sourceForm=event.target.closest('[data-desk-source-form]');
+    if(sourceForm)sourceDrafts.set(sourceForm.dataset.deskSourceForm,event.target.value);
+  });
   document.addEventListener('submit',async event=>{
+    if(event.target.hasAttribute('data-desk-source-form')){
+      event.preventDefault();const form=event.target,gate=updateGate(),id=form.dataset.deskSourceForm;
+      if(gate.blocked){toast(gate.reason,true);return;}
+      if(sourceSaving.has(id))return;
+      const selected=form.elements.cli_source.value;sourceSaving.add(id);renderEngines();
+      try{await api('/api/workflow',{endpoint_settings:{id,values:{cli_source:selected}}});sourceDrafts.delete(id);catalogs.delete(id);if(catalog?.provider===id)catalog=null;toast('执行端来源已保存');await refresh();await loadWorkspace(true);}
+      catch(error){toast(error.message,true);}finally{sourceSaving.delete(id);renderEngines();}
+      return;
+    }
     if(event.target.id!=='desk-concurrency-form')return;
     event.preventDefault();const form=event.target,button=event.submitter;
     const project=form.dataset.project;button.disabled=true;

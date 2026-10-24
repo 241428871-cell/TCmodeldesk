@@ -1,3 +1,11 @@
+# 执行端来源（2026-10-23 更新）
+
+Codex、DSH 默认使用已安装桌面应用中的后台 CLI。在“执行端与 CLI”选择“独立 CLI”并保存即可切换；未检测到的选项显示“未安装”。运行任务、主脑轮次或尚未释放的资源会阻止切换。所选来源缺失不会自动改用另一个安装。
+
+自定义独立路径分别使用 `MODEL_DESK_CODEX_CLI`、`MODEL_DESK_DSH_CLI`；Codex 桌面入口可通过 `MODEL_DESK_CODEX_DESKTOP` 指定应用包内的绝对路径。DSH 桌面路径继续使用 `MODEL_DESK_DSH_EXE`。环境变量只指定对应来源的路径，不替代界面中保存的来源选择。Claude 继续使用 PATH 中现有入口及 cswap 环境。
+
+独立 DSH 支持官方 npm `@deepseek-ai/dsh` 的标准 bin 链接及同安装中的 `@deepseek-ai/dsh-web-app` 预设；无法确认包身份或依赖时拒绝启动，不借用桌面预设。后台 CLI 的[官方配置层级说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/reference/README.md)是安装结构参考。桌面版来源跟随宿主应用更新；独立 Codex 和 Claude 保留原生更新按钮，未知安装器来源不自动更新。下文历史独立安装说明仅用于选择独立模式时。
+
 # 安装与配置（macOS 主线）
 
 本文先写当前 macOS 主线能实际执行的命令。示例路径只是占位，不代表维护者的目录，也不会替你决定安装位置。

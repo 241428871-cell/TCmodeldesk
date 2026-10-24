@@ -335,3 +335,7 @@ html,body{overflow:auto}
 @media(max-width:680px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:520px){.stats{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.stat-tile{grid-column:span 2;padding:8px 10px}.stat-tile:nth-child(n+4){grid-column:span 3}.stat-tile strong{font-size:18px}.stat-tile small{white-space:normal;line-height:1.35}.header-actions .button .label-text{display:none}.header-actions #new-task .label-text{display:inline}.desk-tabs [role=tab]{padding:10px 10px 11px}.ov-card,.settings-card,.desk-inspector,.desk-role-panel{padding:14px}.inspector-save-row{margin:14px -14px -14px;padding:10px 14px}}
 @media(prefers-reduced-motion:reduce){.project-sidebar{transition:none}.tree-caret{transition:none}}
+.engine-source-form{display:flex;flex-wrap:wrap;align-items:end;gap:var(--desk-s2);margin-block:var(--desk-s3)}
+.engine-source-form label{display:grid;gap:var(--desk-s1);max-inline-size:100%;font-size:var(--fs-sm);color:var(--ink-soft)}
+.engine-source-form select{max-inline-size:100%}
+.engine-source-path{font-family:var(--mono);font-size:var(--fs-xs);color:var(--muted);overflow-wrap:anywhere;margin-block:var(--desk-s2)}

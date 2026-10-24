@@ -15,16 +15,21 @@ const ASSETS=new Set(['/','/app.js','/workspace.js','/reconciliation.js','/gover
       const paid={...model,id:'paid',name:'Paid fixture',provider:'deepseek',model:'deepseek-flash',
         api_base:'https://api.deepseek.com',default_agent:'dsh',billing:{pricing:{period:'unknown',label:'fixture'},
           balance:{status:'ready',balance_infos:[{currency:'CNY',total_balance:'12.33'}]}}};
+      const sources=(independent=true)=>({selected:'desktop',options:[
+        {id:'desktop',label:'桌面版内置（默认）',available:true,executable:'/Applications/Fixture.app/Contents/Resources/bin/cli'},
+        {id:'standalone',label:'独立 CLI',available:independent,executable:independent?'/fixture/user/bin/cli':''}]});
       const agents={pi:{name:'Pi Agent',ready:true,access_mode:'full',configuration:{model_fields:[]}},
-        dsh:{name:'DeepSeek Harness',ready:true,access_mode:'full',configuration:{model_fields:[]}}};
+        dsh:{name:'DeepSeek Harness',ready:true,access_mode:'full',configuration:{model_fields:[]},backend_sources:sources(false),ui_policy:'background-only'},
+        codex_cli:{name:'Codex CLI',ready:true,configuration:{model_fields:[]},backend_sources:sources()}};
       const fixture={models:[model,paid],default_model:'home',tasks:[],view:{mode:'project',project:'C:\\fixture'},
         execution_agents:agents,workflow:{enabled:true,execution_agent:'pi',model_scope:'all',paid_allowed:true,
           enforce_paid_budget:false,enforce_model_call_limit:false,daily:{}},
-        codex_usage:{status:'unavailable',buckets:[]},stages:{stats:{},recovery:[]},
+        codex_usage:{status:'unavailable',buckets:[]},execution_activity:{tasks:[],total:0,complete:true},stages:{stats:{},recovery:[]},
         execution_endpoints:{readable:true,rows:[
           {id:'pi',name:'Pi Agent',enabled:true,ready:true,model,models:[model],runtime:agents.pi},
           {id:'dsh',name:'DeepSeek Harness',enabled:true,ready:true,model:paid,models:[paid],runtime:agents.dsh},
-          {id:'workbuddy',name:'WorkBuddy',enabled:false,ready:false,models:[],runtime:{}}]}};
+          {id:'workbuddy',name:'WorkBuddy',enabled:false,ready:false,models:[],runtime:{}},
+          {id:'codex_cli',name:'Codex CLI',enabled:false,ready:true,models:[],runtime:agents.codex_cli}]}};
       page.on('pageerror',error=>errors.push(error.message));
       await page.route('http://modeldesk.invalid/**',async route=>{
         const request=route.request(),pathname=new URL(request.url()).pathname;
@@ -44,6 +49,7 @@ const ASSETS=new Set(['/','/app.js','/workspace.js','/reconciliation.js','/gover
             const block=request.postDataJSON().endpoint_settings;
             const row=fixture.execution_endpoints.rows.find(e=>e.id===block.id);
             Object.assign(row,block.values);data={ok:true};if(block.values.access_mode)row.runtime.access_mode=block.values.access_mode;
+            if(block.values.cli_source)row.runtime.backend_sources.selected=block.values.cli_source;
             if(block.values.native_model){
               const picked={...row.model,id:'native-glm',model:block.values.native_model,name:'WorkBuddy · GLM-5.3'};
               row.model=picked;row.models.push(picked);row.current_model=picked.id;fixture.models.push(picked);
@@ -53,14 +59,44 @@ const ASSETS=new Set(['/','/app.js','/workspace.js','/reconciliation.js','/gover
         await route.fulfill({json:data});
       });
       const engines=page.locator('#desk-engines-dialog');
-      const openEngines=async()=>{if(!(await engines.isVisible()))await page.locator('#desk-engines-open').click();await page.locator('#desk-engines-list .engine-row').first().waitFor();};
+      const openEngines=async()=>{if(!(await engines.isVisible()))await page.locator('#desk-engines-open').click();await page.locator('#desk-engines-list .engine-row').first().waitFor();await page.waitForFunction(()=>!document.querySelector('#desk-engines-dialog').getAnimations({subtree:true}).some(a=>a.playState==='running'&&Number.isFinite(a.effect.getComputedTiming().iterations)));};
       const closeEngines=async()=>{if(await engines.isVisible())await page.locator('#desk-engines-dialog [data-desk-close]').click();};
       const openSettings=async id=>{await openEngines();await page.locator(`[data-desk-engine-config="${id}"]`).click();await page.locator('#endpoint-dialog').waitFor({state:'visible'});};
       // Waits on the panel's own refreshed endpoint state (field: 'access' | 'model').
       const endpointState=(id,field,value)=>page.waitForFunction(([id,field,value])=>{const row=state.execution_endpoints?.rows.find(e=>e.id===id);return !!row&&(field==='access'?row.runtime?.access_mode===value:row.model?.model===value);},[id,field,value]);
       await page.goto(`http://modeldesk.invalid/?host=${host}&project=C%3A%5Cfixture`);
       await openEngines();
-      assert.equal(await page.locator('#desk-engines-list .engine-row').count(),3);
+      assert.equal(await page.locator('#desk-engines-list .engine-row').count(),4);
+      const sourceForm=page.locator('[data-desk-source-form="codex_cli"]');
+      assert.equal(await sourceForm.locator('select').inputValue(),'desktop');
+      assert.equal(await page.locator('[data-desk-source-form="dsh"] option[value="standalone"]').evaluate(node=>node.disabled),true);
+      await sourceForm.locator('select').selectOption('standalone');
+      await page.evaluate(()=>refresh());
+      assert.equal(await sourceForm.locator('select').inputValue(),'standalone','polling preserves unsaved source choice');
+      assert.equal(writes.some(w=>w.body.endpoint_settings?.values.cli_source),false,'selecting alone must not save');
+      await sourceForm.locator('button').click();
+      await page.waitForFunction(()=>state.execution_endpoints.rows.find(e=>e.id==='codex_cli').runtime.backend_sources.selected==='standalone');
+      assert.deepEqual(writes.find(w=>w.body.endpoint_settings?.values.cli_source).body,
+        {endpoint_settings:{id:'codex_cli',values:{cli_source:'standalone'}}});
+      fixture.execution_activity.total=1;
+      await page.evaluate(()=>refresh());
+      assert.equal(await sourceForm.locator('select').isDisabled(),true);
+      assert.equal(await sourceForm.locator('button').isDisabled(),true);
+      fixture.execution_activity.total=0;
+      await page.evaluate(()=>refresh());
+      assert.equal(await sourceForm.locator('select').isDisabled(),false);
+      if(process.env.MODEL_DESK_SCREENSHOT_DIR){
+        fs.mkdirSync(process.env.MODEL_DESK_SCREENSHOT_DIR,{recursive:true});
+        for(const width of [390,1440,1920])for(const mode of ['light','dark']){
+          await page.setViewportSize({width,height:900});
+          await page.evaluate(theme=>document.documentElement.dataset.theme=theme,mode);
+          await sourceForm.scrollIntoViewIfNeeded();
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+          await page.screenshot({path:path.join(process.env.MODEL_DESK_SCREENSHOT_DIR,`${host}-sources-${width}-${mode}.png`)});
+        }
+        await page.setViewportSize({width:1100,height:1000});
+        await page.evaluate(()=>document.documentElement.dataset.theme='light');
+      }
       assert.equal(await page.locator('#model-agent-entry').isVisible(),false);
       assert.match(await page.locator('[data-engine-id="dsh"]').textContent(),/12\.33/);
       assert.match(await page.locator('[data-engine-id="workbuddy"]').textContent(),/未同步/);

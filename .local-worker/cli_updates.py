@@ -125,6 +125,16 @@ def _version(_engine: str, executable: Path | None) -> str:
     if not executable or not executable.is_file():
         return ''
     args = [str(executable), '--version']
+    if _engine == 'dsh' and '.app/Contents/' not in str(executable.resolve()):
+        from cli_sources import dsh_package
+        try:
+            _ = dsh_package(executable)
+            node = runtime_paths.node_executable()
+            if node is None:
+                return ''
+            args = [str(node), str(executable.resolve()), '--version']
+        except ValueError:
+            pass  # A non-npm launcher owns its own interpreter.
     try:
         result = subprocess.run(args, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                                 encoding='utf-8', errors='replace', timeout=15, check=False,
@@ -156,14 +166,14 @@ def status(engine: str) -> CliStatus:
         note = '使用 Claude 官方原生更新器；只在点击更新后执行。'
     elif bundled:
         method, can_update = 'host-app', False
-        host = 'DeepSeek Harness' if engine == 'dsh' else 'ChatGPT'
+        host = 'DeepSeek Harness' if engine == 'dsh' else 'Codex／ChatGPT 桌面'
         note = f'此 CLI 归属 {host} 应用包并随应用更新，工作台不会改写应用包。'
     else:
         method, can_update = 'external', False
         note = ('独立 Codex CLI，不依赖桌面应用；请使用 OpenAI 官方独立安装器更新。'
                 if engine == 'codex_cli' and path else '安装来源无法安全确认；请用原安装器更新。')
     row: CliStatus = {'engine': engine, 'installed': installed, 'executable': path,
-           'source': 'host-app' if bundled else 'standalone' if engine == 'codex_cli' and path else 'native', 'method': method,
+           'source': 'host-app' if bundled else 'standalone' if engine in ('codex_cli', 'dsh') and path else 'native', 'method': method,
            'can_update': can_update, 'checked': False, 'latest': '',
            'update_available': None, 'note': note,
            'version_status': 'unchecked', 'checked_at': '', 'attempted_at': '',

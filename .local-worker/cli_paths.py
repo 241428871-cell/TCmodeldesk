@@ -1,10 +1,12 @@
-"""Resolve external CLIs without borrowing a desktop application's Codex binary."""
+"""Resolve the selected native backend without starting applications."""
 from __future__ import annotations
 
 import os
 import shutil
 from pathlib import Path
 from typing import Final
+
+from cli_sources import selected_source
 
 CODEX_COMMAND_ENV: Final = 'MODEL_DESK_CODEX_CLI'
 
@@ -13,8 +15,8 @@ def _desktop_bundle(path: Path) -> bool:
     return '.app/Contents/' in str(path.resolve())
 
 
-def codex_command() -> Path | None:
-    """Honor an explicit path, then find a standalone command; never use app resources."""
+def standalone_codex() -> Path | None:
+    """Keep desktop symlinks out of the independent installation choice."""
     declared = os.environ.get(CODEX_COMMAND_ENV, '').strip()
     if declared:
         candidate = Path(declared).expanduser()
@@ -29,6 +31,29 @@ def codex_command() -> Path | None:
                   *(Path(directory) / 'codex' for directory in os.get_exec_path())]
     return next((p for p in candidates if p.is_file() and os.access(p, os.X_OK)
                  and not _desktop_bundle(p)), None)
+
+
+def desktop_codex() -> Path | None:
+    declared = os.environ.get('MODEL_DESK_CODEX_DESKTOP', '').strip()
+    if declared:
+        candidate = Path(declared).expanduser()
+        return candidate if (candidate.is_absolute() and candidate.is_file()
+                             and os.access(candidate, os.X_OK) and _desktop_bundle(candidate)) else None
+    roots = (Path('/Applications'), Path.home() / 'Applications')
+    relatives = ('Codex.app/Contents/Resources/codex',
+                 'Codex.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex',
+                 'ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex')
+    candidates = [root / relative for root in roots for relative in relatives]
+    candidates.extend(Path(directory) / 'codex' for directory in os.get_exec_path())
+    return next((p for p in candidates if p.is_file() and os.access(p, os.X_OK)
+                 and _desktop_bundle(p)), None)
+
+
+def codex_command() -> Path | None:
+    source = selected_source('codex_cli')
+    if source is None:
+        return None
+    return desktop_codex() if source == 'desktop' else standalone_codex()
 
 
 def executable(engine: str) -> Path | None:

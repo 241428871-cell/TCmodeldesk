@@ -200,7 +200,7 @@ class PortableRuntimePathTests(unittest.TestCase):
             self.assertIsNone(runtime_paths.dsh_headless_executable(executable))
 
     def test_missing_dsh_is_reported_and_never_replaced(self):
-        with patch.object(dsh_worker, 'EXECUTABLE', runtime_paths.UNSET), \
+        with patch.object(runtime_paths, 'dsh_executable', return_value= runtime_paths.UNSET), \
                 patch.object(dsh_worker, 'NODE', runtime_paths.UNSET):
             info = dsh_worker.availability()
         self.assertFalse(info['ready'])
@@ -217,7 +217,7 @@ class PortableRuntimePathTests(unittest.TestCase):
             node.write_text('fixture', encoding='utf-8')
             acpx = install / 'acpx-runtime.js'
             acpx.write_text('fixture', encoding='utf-8')
-            with patch.object(dsh_worker, 'EXECUTABLE', executable), patch.object(dsh_worker, 'NODE', node), \
+            with patch.object(runtime_paths, 'dsh_executable', return_value= executable), patch.object(dsh_worker, 'NODE', node), \
                     patch.object(dsh_worker.runtime_paths, 'acpx_runtime', lambda runtime_dir=None: acpx), \
                     patch.object(dsh_worker.runtime_paths, 'node_version', return_value='22.13.0'), \
                     patch.object(dsh_worker.executor_adapter, 'installed_executor_version',
@@ -238,7 +238,7 @@ class PortableRuntimePathTests(unittest.TestCase):
             node.write_text('fixture', encoding='utf-8')
             acpx = install / 'acpx-runtime.js'
             acpx.write_text('fixture', encoding='utf-8')
-            with patch.object(dsh_worker, 'EXECUTABLE', executable), \
+            with patch.object(runtime_paths, 'dsh_executable', return_value= executable), \
                     patch.object(dsh_worker, 'NODE', node), \
                     patch.object(dsh_worker.runtime_paths, 'node_version', return_value='24.0.0'), \
                     patch.object(dsh_worker.runtime_paths, 'acpx_runtime', return_value=acpx), \
@@ -259,7 +259,7 @@ class PortableRuntimePathTests(unittest.TestCase):
             node.write_text('fixture', encoding='utf-8')
             acpx = install / 'acpx-runtime.js'
             acpx.write_text('fixture', encoding='utf-8')
-            with patch.object(dsh_worker, 'EXECUTABLE', executable), \
+            with patch.object(runtime_paths, 'dsh_executable', return_value= executable), \
                     patch.object(dsh_worker, 'NODE', node), \
                     patch.object(dsh_worker.runtime_paths, 'acpx_runtime', return_value=acpx), \
                     patch.object(dsh_worker.executor_adapter, 'installed_executor_version',

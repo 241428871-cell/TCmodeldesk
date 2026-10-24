@@ -82,10 +82,18 @@ def _macos_dsh_executable(candidates=None):
                  if path.is_file() and not path.is_symlink()), None)
 
 
-def dsh_executable():
+def dsh_desktop_executable():
     """The user's declared, PATH-resolved or existing standard DSH executable."""
     return (declared(DSH_EXE_ENV) or which(DSH_EXECUTABLE_NAME)
             or which('DeepSeek Harness') or _macos_dsh_executable())
+
+
+def dsh_executable():
+    from cli_sources import selected_source, standalone_dsh
+    source = selected_source('dsh')
+    if source is None:
+        return None
+    return dsh_desktop_executable() if source == 'desktop' else standalone_dsh()
 
 
 def dsh_headless_executable(executable=None):
@@ -113,7 +121,7 @@ def dsh_headless_executable(executable=None):
     return helper if helper.is_file() and not helper.is_symlink() else None
 
 
-def dsh_command(executable: Path | None = None) -> Path | None:
+def dsh_desktop_command(executable: Path | None = None) -> Path | None:
     """Return the installed official ``dsh`` command without launching it.
 
     The macOS Desktop distribution installs this command explicitly for
@@ -121,10 +129,7 @@ def dsh_command(executable: Path | None = None) -> Path | None:
     version-locked to the application, so callers must prefer it over rebuilding
     the private invocation from paths inside ``app.asar``.
     """
-    declared_command = declared('MODEL_DESK_DSH_CLI') or which('dsh')
-    if declared_command and declared_command.is_file():
-        return declared_command
-    target = Path(executable) if executable else dsh_executable()
+    target = Path(executable) if executable else dsh_desktop_executable()
     if target is None:
         return None
     if target.suffix.lower() == '.exe':
@@ -133,6 +138,14 @@ def dsh_command(executable: Path | None = None) -> Path | None:
         command = target.parent.parent / 'Resources/runtime/cli/bin/dsh'
         return command if command.is_file() and os.access(command, os.X_OK) else None
     return None
+
+
+def dsh_command(executable: Path | None = None) -> Path | None:
+    from cli_sources import selected_source, standalone_dsh
+    source = selected_source('dsh')
+    if source is None:
+        return None
+    return dsh_desktop_command(executable) if source == 'desktop' else standalone_dsh()
 
 
 def dsh_archive(executable=None):

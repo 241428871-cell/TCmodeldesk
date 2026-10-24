@@ -58,7 +58,7 @@ def availability(engine: str) -> Availability:
         raise CliRuntimeError('未知 CLI 执行端')
     name = EXECUTABLES[engine]
     executable = cli_paths.executable(engine)
-    missing = ('未找到独立 Codex CLI；请安装官方独立版本，或设置 MODEL_DESK_CODEX_CLI。不会使用桌面应用内置版本'
+    missing = ('所选 Codex 执行端不可用；请在“执行端与 CLI”核对桌面内置／独立 CLI 的选择及安装路径'
                if engine == 'codex_cli' else f'未在 PATH 找到 {name}；请安装并登录该 CLI')
     return {'ready': bool(executable), 'name': 'Claude CLI' if engine == 'claude_cli' else 'Codex CLI',
             'engine': engine, 'executable': str(executable) if executable else '', 'transport': 'local-cli',

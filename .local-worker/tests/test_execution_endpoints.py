@@ -254,6 +254,32 @@ class EndpointTests(unittest.TestCase):
         with self.assertRaises(mcp.PanelError):
             mcp.validate_request('/api/execution-endpoints/unknown', 'POST')
 
+    def test_source_switch_checks_activity_through_both_shared_http_routes(self):
+        server = ThreadingHTTPServer(('127.0.0.1', 0), panel.Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close); self.addCleanup(server.shutdown)
+        opener = build_opener(ProxyHandler({}))
+        base = f'http://127.0.0.1:{server.server_port}'
+        headers = {'Content-Type': 'application/json', 'X-Panel-Token': panel.TOKEN}
+        choices = {'options': [{'id': key, 'available': True} for key in ('desktop', 'standalone')]}
+        for path in ('/api/execution-endpoints/codex_cli', '/api/workflow'):
+            def request(source):
+                values = {'cli_source': source}
+                body = {'endpoint_settings': {'id': 'codex_cli', 'values': values}} if path.endswith('workflow') else values
+                with opener.open(Request(base + path, data=json.dumps(body).encode(), headers=headers), timeout=5) as response:
+                    return json.load(response)
+            with patch.object(ep, 'backend_sources', return_value=choices):
+                for activity in ({'complete': False, 'tasks': [], 'goals': []},
+                                 {'complete': True, 'tasks': [], 'goals': [{'id': 'live'}]}):
+                    with patch.object(panel, 'cli_update_activity', return_value=activity):
+                        with self.assertRaises(HTTPError) as error:
+                            request('standalone')
+                    self.assertEqual(error.exception.code, 400)
+                    self.assertEqual(ep.snapshot()['endpoints']['codex_cli']['cli_source'], 'desktop')
+                with patch.object(panel, 'cli_update_activity', return_value={'complete': True, 'tasks': [], 'goals': []}):
+                    self.assertEqual(request('standalone')['cli_source'], 'standalone')
+                    self.assertEqual(request('desktop')['cli_source'], 'desktop')
+
     def test_dsh_candidates_and_common_startup_signal_exclude_disabled_endpoint(self):
         import brain_gateway
         ep.update('pi', {'enabled': False}, self.settings)

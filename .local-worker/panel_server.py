@@ -123,6 +123,17 @@ def cli_update_activity():
     return {'tasks': activity['tasks'], 'goals': goals, 'complete': complete}
 
 
+def cli_source_idle_guard():
+    activity = cli_update_activity()
+    if not activity['complete']:
+        raise ValueError('执行状态无法完整核对，暂不能切换执行端来源')
+    if activity['tasks'] or activity['goals']:
+        raise ValueError('仍有任务或主脑轮次运行，请结束后切换执行端来源')
+    resources = execution_leases.state()
+    if resources.held or resources.waiting:
+        raise ValueError('仍有执行资源未释放或待核对，请处理后切换执行端来源')
+
+
 def capability_rows():
     """Capability rows enriched with the route endpoint the worker bills against.
 
@@ -2692,12 +2703,12 @@ class Handler(BaseHTTPRequestHandler):
                     block = body['endpoint_settings']
                     if set(body) != {'endpoint_settings'} or not isinstance(block, dict) or set(block) != {'id', 'values'}:
                         raise ValueError('执行端设置需要独立保存，不能混入范围、预算或授权')
-                    return self.send_json(execution_endpoints.update(block['id'], block['values'], workflow_settings.snapshot()))
+                    return self.send_json(execution_endpoints.update(block['id'], block['values'], workflow_settings.snapshot(), idle_guard=cli_source_idle_guard))
                 return self.send_json(workflow_settings.save_settings(body))
             endpoint_match = re.fullmatch(r'/api/execution-endpoints/(pi|dsh|workbuddy|claude_cli|codex_cli)', path)
             if endpoint_match:
                 import execution_endpoints
-                return self.send_json(execution_endpoints.update(endpoint_match.group(1), body, workflow_settings.snapshot()))
+                return self.send_json(execution_endpoints.update(endpoint_match.group(1), body, workflow_settings.snapshot(), idle_guard=cli_source_idle_guard))
             if path == '/api/codex-usage/refresh':
                 return self.send_json(codex_usage.usage_state(force=True))
             if path == '/api/route-preview':

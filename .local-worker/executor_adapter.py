@@ -223,6 +223,14 @@ def installed_executor_version(executable=None):
     and the worker can call this without repeating expensive I/O.
     """
     exe = Path(executable) if executable else executor_path()
+    if runtime_paths.dsh_archive(exe) is None or not runtime_paths.dsh_archive(exe).is_file():
+        from cli_sources import dsh_package
+        try:
+            _, package = dsh_package(exe)
+            # Desktop capability evidence must not authorize a different host.
+            return 'standalone:' + package.version
+        except ValueError:
+            return None
     return _asar_version(exe)
 
 

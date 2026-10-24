@@ -136,18 +136,23 @@
     },
     {
       "path": ".local-worker/cli_paths.py",
-      "sha256": "bd3ed548ea634e974017a037584e842b8fc19792d104a316e14239b0d8fdd6ba",
-      "bytes": 1784
+      "sha256": "be18520a99af68ddda6d37db95a17402d6d483e10e3dd1cb2d2f499996a0af3a",
+      "bytes": 2955
+    },
+    {
+      "path": ".local-worker/cli_sources.py",
+      "sha256": "af4d96afba5690b470eacad48f2cf8072420a19321b13031d21a14596e32802e",
+      "bytes": 3664
     },
     {
       "path": ".local-worker/cli_updates.py",
-      "sha256": "9a098f13cde919807f5ae55cb4a6b5a29745d65a5f97b233c9570e52f01ac7a5",
-      "bytes": 9961
+      "sha256": "3385314f74960fb90c4ca0d997d516fe03ed024e37f5be9caa3bdae39ef959c4",
+      "bytes": 10430
     },
     {
       "path": ".local-worker/cli_worker.py",
-      "sha256": "5aea7c5b193333dd8836b257444f43a5316dd80bb86f8bdcbc311d1f9e078282",
-      "bytes": 21296
+      "sha256": "5afa8675bc42a4af1f65eb4d50dd2c454223636473343bf05373dc873e216034",
+      "bytes": 21287
     },
     {
       "path": ".local-worker/cli_writeback.py",
@@ -161,8 +166,8 @@
     },
     {
       "path": ".local-worker/codex_usage.py",
-      "sha256": "682a3fe1a56b23fab4cd30b395f0f5f1b2c7d66bcd236f7aad492079e098c4a1",
-      "bytes": 7398
+      "sha256": "f151201280c1c2891f6c9938a8b04649983673e6d98882ad9bea352f0359b4c3",
+      "bytes": 7408
     },
     {
       "path": ".local-worker/collaboration_status.py",
@@ -261,8 +266,8 @@
     },
     {
       "path": ".local-worker/dsh_worker.py",
-      "sha256": "cadf95310eccc03ddd41e01e510cf158e29f2681815d33206c20ec73b185c42d",
-      "bytes": 45356
+      "sha256": "e3b5691be063d8e6a9e15d1fdc33cca1f2bfefb24e17e46134892c25b60d3c7e",
+      "bytes": 46175
     },
     {
       "path": ".local-worker/dynamic_plan.py",
@@ -296,8 +301,8 @@
     },
     {
       "path": ".local-worker/execution_endpoints.py",
-      "sha256": "88f5fd6265bced5ae5532377811a7ec16fb94cfb5d09225fe4c3e1e64a59907f",
-      "bytes": 9896
+      "sha256": "b7fb7d32ad0cb9f60d08da4dc0af769654e8e7ede4a1bb20a7449ef7b4f79d90",
+      "bytes": 11940
     },
     {
       "path": ".local-worker/execution_engines.py",
@@ -311,8 +316,8 @@
     },
     {
       "path": ".local-worker/executor_adapter.py",
-      "sha256": "ee4212759600c0558a80d31d34cfb4cb0c3655460dd786836c1371d1a15cd523",
-      "bytes": 38355
+      "sha256": "bfdca7d57f9183cb618cd2d1210584a89c0e540b235e79d0ea07d2c0b02bb587",
+      "bytes": 38730
     },
     {
       "path": ".local-worker/failure_classification.py",
@@ -591,13 +596,13 @@
     },
     {
       "path": ".local-worker/panel/workspace.css",
-      "sha256": "e009905d6ab15568ea9f51163a6f2f3f4b4d6ce1cc8171fda2c3f63c700b56ef",
-      "bytes": 32740
+      "sha256": "e45a26f59585e5c2f31a17c0ef7848c3d6c0d348a8baa35a181a0d8a6ca3b294",
+      "bytes": 33164
     },
     {
       "path": ".local-worker/panel/workspace.js",
-      "sha256": "0367af210d66754da904cef1644161d1678e61bc46b88d7a2eefbb404d10f809",
-      "bytes": 73934
+      "sha256": "4aac2dee202933197864fafee8a7d73c6168718d725903fbd66aeb5c542d523f",
+      "bytes": 76115
     },
     {
       "path": ".local-worker/panel_bundle.py",
@@ -611,8 +616,8 @@
     },
     {
       "path": ".local-worker/panel_server.py",
-      "sha256": "a79dd34cec3f43c222d79fa69d1f0a249198abf5b7626cb4a1d503e4597b97be",
-      "bytes": 166260
+      "sha256": "56995a5c9223484eaed7890219fe6b86fed6620b9c7f2a731e1648dd5348b476",
+      "bytes": 166855
     },
     {
       "path": ".local-worker/panel_service.py",
@@ -651,8 +656,8 @@
     },
     {
       "path": ".local-worker/preset_runtime.py",
-      "sha256": "4f12845212bf4bbe9bf8879c4df1cd96b306c9d7d8137f91888799f0382371d2",
-      "bytes": 13224
+      "sha256": "393c167a4c681ccfcc4b30d95de1a7548df71300c8a657a02166b5458e5a7339",
+      "bytes": 13752
     },
     {
       "path": ".local-worker/project_scope.py",
@@ -671,8 +676,8 @@
     },
     {
       "path": ".local-worker/provider_accounts.py",
-      "sha256": "b51968d9d5cd821b87181c490572d3cbb97b09e7bb7c326c327dd0bd8ae8f0ea",
-      "bytes": 14056
+      "sha256": "37a56b11aa5043ba9eccc58000725154e896a50020053e1baded4b12cd9ce93f",
+      "bytes": 15006
     },
     {
       "path": ".local-worker/record_protection.py",
@@ -701,8 +706,8 @@
     },
     {
       "path": ".local-worker/runtime_paths.py",
-      "sha256": "5a8a147aa7193da6a71a54750208c68dd329fb0cc6dc025cf3e98d80828585ce",
-      "bytes": 9797
+      "sha256": "74081d09b28d4a321442b7ea5f499cf3c73213588d6fa6efb236bc55b7d08170",
+      "bytes": 10200
     },
     {
       "path": ".local-worker/source_manifest.py",
@@ -911,8 +916,13 @@
     },
     {
       "path": ".local-worker/tests/test_cli_paths.py",
-      "sha256": "689268817320d471ce2f0201bd22dce651f7fd7a67bb3015a6e839386595a755",
-      "bytes": 2615
+      "sha256": "9153422654ea277f7bf01c8e6aa1493c104e8d0058dd4f83c04b56df15e8e527",
+      "bytes": 3973
+    },
+    {
+      "path": ".local-worker/tests/test_cli_sources.py",
+      "sha256": "9ef1fb0f6f3cb12a58366b4fdd629b7580433bb8273a19f54d4852d6b8646109",
+      "bytes": 8294
     },
     {
       "path": ".local-worker/tests/test_cli_updates.py",
@@ -1066,13 +1076,13 @@
     },
     {
       "path": ".local-worker/tests/test_endpoint_cards.cjs",
-      "sha256": "8cdcbeed8904f120728b157cfffc30171e39e4837665cd4bf8a0e74dbfa18b9f",
-      "bytes": 13397
+      "sha256": "d254c9047200845b08719d8251276c48eb19b6308fdf5768fc657f42407a8423",
+      "bytes": 16556
     },
     {
       "path": ".local-worker/tests/test_execution_endpoints.py",
-      "sha256": "039b3064dca9cf74a74dc53ae5104462fc630c6f9b8e586a8c2ebbfc004ca305",
-      "bytes": 16802
+      "sha256": "bb7651cf554ba40ed7261228b478af88bf3176cb5151eee483b7ad444304fbb8",
+      "bytes": 18778
     },
     {
       "path": ".local-worker/tests/test_execution_engines.py",
@@ -1276,8 +1286,8 @@
     },
     {
       "path": ".local-worker/tests/test_opensource_bootstrap.py",
-      "sha256": "f94f68ad603ee27a7bb2b6572385a76d4dda50f49847d2cf59b8c91296586cd7",
-      "bytes": 23156
+      "sha256": "c3e9c1f10d7fa4edb731edd8234ae7c05eff752af454a8f05d5be83001861aa2",
+      "bytes": 23240
     },
     {
       "path": ".local-worker/tests/test_panel.py",
@@ -1651,8 +1661,8 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "222657d1f99eaca5103c9b5d38021f4e44e29cb1edb348f63315815be1684010",
-      "bytes": 14042
+      "sha256": "ba41896e303eeea2d2b3ce19618ccc91280979206fe587de964976c36f8cae42",
+      "bytes": 14347
     },
     {
       "path": "LICENSE",
@@ -2296,8 +2306,8 @@
     },
     {
       "path": "docs/CROSS_HOST_FEATURES.md",
-      "sha256": "01e800b878d9927e92959da7f2e44ad84f9d904483f0cc06f20aaf35e6ab90ce",
-      "bytes": 33117
+      "sha256": "b0850f5978de8c98c526ddd1c969c8968b9f8ac6e5d017478a93c94ec745fcb6",
+      "bytes": 34363
     },
     {
       "path": "docs/DSH_BRAIN_PLUGIN.md",
@@ -2331,8 +2341,8 @@
     },
     {
       "path": "docs/INSTALL.md",
-      "sha256": "c6bd4a5a06028ea8bcb9c35e4fedda7258cdc99797ef7620671a3e39dfa79c9c",
-      "bytes": 18387
+      "sha256": "ac2235b97042303309c43a7238e27c651298efa7e82cad31befdf26fec4e04e1",
+      "bytes": 19652
     },
     {
       "path": "docs/MAIN_BRAIN_CORE.md",
@@ -2371,13 +2381,18 @@
     },
     {
       "path": "docs/完整软件设计.md",
-      "sha256": "4a7f77e29a2a0ffa4f786eb55f5ce2ee22f802ad6df85169f0ba67955fdb279d",
-      "bytes": 65926
+      "sha256": "fc76ace52d7ea3329935fcc2ffd95fb80685bb89c0d3175c198c0d7f40dab698",
+      "bytes": 66288
     },
     {
       "path": "docs/并发与移交验收.md",
       "sha256": "e737cec48bc0d9e7897f2319aaed1fb93919f4ffd32e0dfc441c2ebebacd5ab2",
       "bytes": 7817
+    },
+    {
+      "path": "docs/执行端来源验收.md",
+      "sha256": "005ed7eb2c98d9943ed09606c5ef8514052192a9e3b42dc04bc440a4875ba773",
+      "bytes": 2984
     },
     {
       "path": "docs/持久租约接线验收.md",
@@ -2386,8 +2401,8 @@
     },
     {
       "path": "docs/最终收尾验收.md",
-      "sha256": "75a996ab4bc7b68e94c0b77f34e9a44ccf37e6b9988baa9cc9eb31c178150151",
-      "bytes": 7108
+      "sha256": "af5f26aa63c6f820a45652a6b961cba437b3f9aa8bd4984ecdc3a1b368f26082",
+      "bytes": 7429
     },
     {
       "path": "docs/权限约束声明.md",
@@ -2406,8 +2421,8 @@
     },
     {
       "path": "docs/重构进度.md",
-      "sha256": "cf96575c03ae68da5d3a7575bd89b6395e7794a80c589cdff37dbc93fabb220b",
-      "bytes": 173744
+      "sha256": "178acf0c43a9a9e23e3f16f14b36372a1ac8f36716e0a51ad28fbfb83d2ee7a5",
+      "bytes": 175604
     },
     {
       "path": "environment.yml",

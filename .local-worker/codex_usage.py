@@ -60,7 +60,7 @@ def find_codex():
     found = cli_paths.codex_command()
     if found:
         return str(found)
-    raise UsageError('未找到独立 Codex CLI，无法读取账号额度；不会使用桌面应用内置版本。')
+    raise UsageError('所选 Codex 执行端不可用，无法读取账号额度；请在“执行端与 CLI”核对来源。')
 
 
 def query_limits(timeout=25):

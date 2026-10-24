@@ -40,7 +40,7 @@ RUNTIME = HERE / 'agent-runtime'
 # Nothing here points at an author's drive, user profile or editor cache.  An
 # unconfigured runtime stays ``UNSET`` so availability reports "not ready"
 # instead of substituting another executor.
-EXECUTABLE = runtime_paths.dsh_executable() or runtime_paths.UNSET
+EXECUTABLE = runtime_paths.dsh_desktop_executable() or runtime_paths.UNSET
 NODE = runtime_paths.node_executable() or runtime_paths.UNSET
 # Post-stream process-exit grace.  The ACP child has already closed both streams
 # and returned (or refused) its outcome; a slow teardown must never discard a real
@@ -56,23 +56,29 @@ def availability():
     "installed", so the panel, the capability evidence and the worker can never
     look at two different DSH installs.
     """
-    cli = runtime_paths.dsh_cli(EXECUTABLE)
+    executable = runtime_paths.dsh_executable() or runtime_paths.UNSET
+    cli = runtime_paths.dsh_cli(executable)
     blocked = []
     executor_version = None
     node_version = ''
-    command = runtime_paths.dsh_command(EXECUTABLE)
-    if not EXECUTABLE.is_file():
+    command = runtime_paths.dsh_command(executable)
+    if not executable.is_file():
         blocked.append(f'DSH 可执行文件未找到（可设置 {runtime_paths.DSH_EXE_ENV} 指向本机安装；'
                        'macOS 还会检查标准应用目录，其他安装可加入 PATH）')
     else:
-        archive = runtime_paths.dsh_archive(EXECUTABLE)
-        executor_version = executor_adapter.installed_executor_version(EXECUTABLE)
+        archive = runtime_paths.dsh_archive(executable)
+        executor_version = executor_adapter.installed_executor_version(executable)
         try:
-            if archive is None or executor_version is None:
+            if executor_version is None:
                 raise ValueError('unreadable runtime')
-            preset_runtime._asar_read(archive, runtime_paths.DSH_CLI_RELATIVE)
+            if executor_version.startswith('standalone:'):
+                preset_runtime._standard_sources(preset_runtime._asar_path(executable))
+            else:
+                if archive is None:
+                    raise ValueError('missing archive')
+                preset_runtime._asar_read(archive, runtime_paths.DSH_CLI_RELATIVE)
         except (OSError, TypeError, ValueError):
-            blocked.append('DSH 应用包版本或官方 desktop CLI 无法核对')
+            blocked.append('DSH 安装包版本、预设或官方 desktop CLI 无法核对')
         if command is None:
             blocked.append('官方 dsh CLI 未安装；为避免弹出桌面界面，已拒绝改用主应用进程')
     if not NODE.is_file():
@@ -85,7 +91,7 @@ def availability():
         blocked.append(f'本仓库的 acpx {runtime_paths.ACPX_VERSION} 依赖未安装'
                        f'（在 .local-worker{os.sep}agent-runtime 目录执行 pnpm install）')
     return {'ready': not blocked,
-            'name': 'DeepSeek Harness', 'transport': 'ACP', 'executable': str(EXECUTABLE),
+            'name': 'DeepSeek Harness', 'transport': 'ACP', 'executable': str(executable),
             'command': str(command or ''),
             'ui_policy': 'background-only',
             'executor_version': executor_version,
@@ -105,13 +111,19 @@ def background_executable(info):
     if not isinstance(candidate, str) or not candidate.strip():
         raise ValueError('官方 dsh CLI 不可用；已拒绝启动桌面主进程')
     desktop = info.get('executable')
-    if sys.platform == 'darwin' and isinstance(desktop, str) and Path(candidate) == Path(desktop):
+    if (sys.platform == 'darwin' and isinstance(desktop, str) and
+            Path(candidate) == Path(desktop) and '.app/Contents/MacOS/' in desktop):
         raise ValueError('dsh CLI 不可以是桌面主进程')
     return candidate
 
 
 def fingerprint(model, kind, project, preset=None, access='full'):
     data = [model['id'], model['api_base'], model['model'], model.get('max_input_tokens'), model.get('max_output_tokens'), kind, str(project)]
+    from cli_sources import selected_source
+    if selected_source('dsh') == 'standalone':
+        command = runtime_paths.dsh_command()
+        data += ['standalone', str(command.resolve()) if command else '',
+                 executor_adapter.installed_executor_version()]
     if kind != 'edit' and access != 'full':
         data += ['access', access]
     if kind == 'edit':
@@ -388,7 +400,8 @@ def _prepare_dsh(run, state, model, relay):
     files = [(project / name).resolve() for name in state.get('files', [])]
     before = {str(p.relative_to(project)): digest(p) for p in files}
     session_key = state.get('dsh_session_key') or 'desk-' + state['id']
-    base_preset = preset_runtime.load(model, EXECUTABLE)
+    executable = Path(info.get('executable', EXECUTABLE))
+    base_preset = preset_runtime.load(model, executable)
     access = endpoint_access.task_mode(state)
     current_fingerprint = fingerprint(model, state['kind'], project, base_preset, access=access)
     if state.get('connection_fingerprint') and state['connection_fingerprint'] != current_fingerprint:
@@ -399,7 +412,7 @@ def _prepare_dsh(run, state, model, relay):
     if allowed_subagent:
         # Mount exactly one controlled in-process spawn tool.  The revision stays
         # the base content identity so the panel still agrees with the worker.
-        preset = preset_runtime.load(model, EXECUTABLE, subagent=True,
+        preset = preset_runtime.load(model, executable, subagent=True,
                                      child_config=subagent_runtime.child_config(model))
     else:
         preset = base_preset
@@ -423,12 +436,13 @@ def _prepare_dsh(run, state, model, relay):
     agent_prompt = run / 'dsh-prompt.txt'
     agent_prompt.write_text(prompt, encoding='utf-8')
     ledger = subagent_runtime.ledger_path(run) if allowed_subagent else None
-    # The install identity remains the app package (for presets/version proof),
-    # while execution starts through the official installed dsh CLI.  The CLI
-    # owns the signed headless invocation and never activates the desktop UI.
+    # Desktop owns its headless launcher. The independent npm entry uses the
+    # validated Node, even when that Node is not on the host application's PATH.
     launch_executable = background_executable(info)
+    independent = str(info.get('executor_version', '')).startswith('standalone:')
     job = {**info, 'desktop_executable': info.get('executable', str(EXECUTABLE)),
-           'executable': launch_executable, 'cli': '',
+           'executable': str(NODE) if independent else launch_executable,
+           'cli': str(Path(launch_executable).resolve()) if independent else '',
            'access_mode': access, 'task_id': state['id'], 'kind': state['kind'], 'model': model['model'],
            'cwd': str(project), 'patch': str(patch_path), 'state_dir': str(RUNTIME / 'state'),
            'session_key': session_key, 'prompt_file': str(agent_prompt),
