@@ -60,7 +60,7 @@ _LOCK: Final = Lock()
 _CATALOGS: Final[dict[str, Catalog]] = {}
 _ACCOUNTS: Final[dict[str, Account]] = {}
 _GENERATIONS: Final[dict[str, int]] = {}
-_PROVIDERS: Final = {'claude_cli': 'claude', 'codex_cli': 'codex'}
+_PROVIDERS: Final = {'claude_cli': 'claude', 'codex_cli': 'codex', 'dsh': 'dsh'}
 _EFFORTS: Final = {'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'}
 
 
@@ -156,6 +156,28 @@ def _capabilities(provider: str) -> JsonMap:
             'version_checked': flags is not None}
 
 
+def _dsh_models() -> list[ModelInfo]:
+    import dsh_metadata
+    rows = dsh_metadata.probe().get('models', [])
+    result: list[ModelInfo] = []
+    for item in rows:
+        row = _map(item)
+        route, ident = _text(row.get('provider')), _text(row.get('id'), 200)
+        if not route or not ident:
+            continue
+        model: ModelInfo = {'id': json.dumps([route, ident], separators=(',', ':')),
+            'name': (_text(row.get('name')) or ident) + (' · 登录账户' if route == 'deepseek-account' else ' · API Key'),
+            'description': 'DSH 原生路由 · ' + route,
+            'effort_levels': [_text(level) for level in row.get('effort_levels', []) if isinstance(level, str)],
+            'default_effort': _text(row.get('default_effort')), 'is_default': False,
+            'fast_supported': False}
+        context = row.get('context_window')
+        if type(context) is int:
+            model['context_window'] = context
+        result.append(model)
+    return result
+
+
 def catalog_snapshot(provider: str) -> Catalog:
     """Return the last catalog without launching a CLI or contacting a provider."""
     with _LOCK:
@@ -170,9 +192,10 @@ def catalog(provider: str) -> Catalog:
         raise ProviderError('此服务类型请通过其 API 模型列表读取')
     with _LOCK:
         generation = _GENERATIONS.get(provider, 0)
-    source = 'claude-sdk-control/list_models' if provider == 'claude_cli' else 'codex-app-server/model/list'
+    source = {'claude_cli': 'claude-sdk-control/list_models', 'codex_cli': 'codex-app-server/model/list',
+              'dsh': 'dsh-cli/llm.listModels+resolveModel'}[provider]
     try:
-        models = _claude_models() if provider == 'claude_cli' else _codex_models()
+        models = {'claude_cli': _claude_models, 'codex_cli': _codex_models, 'dsh': _dsh_models}[provider]()
         if not models:
             raise ProviderError('本机 CLI 没有返回模型，请检查登录和组织模型权限')
         result: Catalog = {'provider': provider, 'models': models, 'state': 'ready',
@@ -255,11 +278,22 @@ def _codex_account() -> Account:
 
 
 def _deepseek_account(model_id: str, force: bool) -> Account:
+    if not model_id:
+        import account_metadata
+        import connection_accounts
+        account = next((row for row in connection_accounts.listing()
+                        if not row['legacy'] and deepseek_billing.is_official(row)), None)
+        if account:
+            result = account_metadata.balance(account['id'], force=force)
+            return {'provider': 'deepseek', 'state': str(result.get('state', 'unknown')),
+                'source': deepseek_billing.BALANCE_DOC_URL, 'balance_infos': result.get('balance_infos', []),
+                'updated_at': str(result.get('updated_at', '')), 'available': result.get('is_available') is True,
+                'message': str(result.get('message', 'DeepSeek 官方 API 账户余额'))}
     models = registry.list_models().get('models', [])
     row = next((item for item in models if (not model_id or item['id'] == model_id)
                 and deepseek_billing.is_official(item)), None)
     base: Account = {'provider': 'deepseek', 'source': deepseek_billing.BALANCE_DOC_URL,
-                     'state': 'unknown', 'message': '添加 DeepSeek 官方 API 模型和密钥后查看余额'}
+                     'state': 'unknown', 'message': '添加 DeepSeek 官方 API 账户和密钥后查看余额'}
     if row is None:
         return base
     if force:
@@ -315,6 +349,31 @@ def account_snapshot(provider: str, model_id: str = '', force: bool = False) -> 
     """Read cache, or explicitly refresh a native quota/official API balance."""
     if provider == 'deepseek':
         return _deepseek_account(model_id, force)
+    if provider == 'dsh':
+        import dsh_metadata
+        import host_balance
+        if force:
+            with _LOCK:
+                generation = _GENERATIONS.get(provider, 0)
+            try:
+                raw = _map(dsh_metadata.probe(balance=True).get('account'))
+            except ProviderError:
+                raw = {'status': 'error', 'wallets': []}
+            from datetime import timedelta
+            moment = datetime.now(timezone.utc)
+            with _LOCK:
+                if generation != _GENERATIONS.get(provider, 0):
+                    return {'provider': 'dsh', 'state': 'unknown', 'available': False,
+                            'balance': [], 'message': 'DSH 来源已变更，请重新读取官方账户'}
+                host_balance.record({'schema': 1, 'host': 'dsh', 'source': 'dsh-account-controller',
+                    'source_api': 'account.getBalance', 'status': raw.get('status', 'unavailable'),
+                    'wallets': raw.get('wallets', []), 'fetched_at': moment.isoformat(),
+                    'expires_at': (moment + timedelta(minutes=5)).isoformat(), 'error': ''})
+        saved = host_balance.state()
+        return {'provider': 'dsh', 'state': saved['status'], 'source': 'dsh-cli/account.getBalance',
+                'message': saved['message'], 'updated_at': saved.get('fetched_at') or '',
+                'available': saved['status'] == 'ready', 'stale': saved.get('stale', False),
+                'balance': saved.get('wallets', [])}
     if provider not in _PROVIDERS:
         raise ProviderError('此服务尚未提供账户额度读取接口')
     with _LOCK:

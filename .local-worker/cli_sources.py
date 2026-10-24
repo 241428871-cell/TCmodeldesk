@@ -53,6 +53,7 @@ def standalone_dsh() -> Path | None:
         found = shutil.which('dsh')
         candidates = ([Path(found)] if found else []) + [Path.home() / '.local/bin/dsh']
         candidates += [Path(directory) / 'dsh' for directory in os.get_exec_path()]
+        candidates.append(Path.home() / '.local/share/tcmodeldesk/dsh-cli/bin/dsh')
     return next((p for p in candidates if p.is_absolute() and p.is_file()
                  and os.access(p, os.X_OK) and '.app/Contents/' not in str(p.resolve())), None)
 

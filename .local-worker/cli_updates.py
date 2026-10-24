@@ -158,9 +158,13 @@ def status(engine: str) -> CliStatus:
     except OSError:
         source_path = path
     bundled = '.app/Contents/' in source_path
+    import dsh_installation
     if engine == 'codex_cli' and path and not bundled and _standalone_package(executable, installed):
         method, can_update = 'codex update', True
         note = '已识别 Codex 独立安装包，不依赖桌面应用；只在点击更新后调用其原生 codex update。'
+    elif engine == 'dsh' and dsh_installation.update_command(executable):
+        method, can_update = 'official-npm', True
+        note = '独立官方 DSH 安装；显式更新仅修改此 npm 前缀，不改桌面应用、账户或插件配置。'
     elif engine == 'claude_cli' and path:
         method, can_update = 'claude update', True
         note = '使用 Claude 官方原生更新器；只在点击更新后执行。'
@@ -221,7 +225,7 @@ def check(engine: str) -> CliStatus:
     comparable = row['can_update']
     row.update({'checked': True, 'latest': latest,
                 'checked_at': _now(), 'version_status': 'ready', 'stale': False, 'error': '',
-                'update_available': (latest != row['installed']) if comparable and latest and row['installed'] else None})
+                'update_available': newer(latest, row['installed']) if comparable and latest and row['installed'] else None})
     with _LOCK:
         _CACHE[engine] = row.copy()
     return status(engine)
@@ -232,7 +236,14 @@ def update(engine: str) -> CliStatus:
     if not row['can_update']:
         raise ValueError(row['note'])
     executable = row['executable']
-    result = subprocess.run([executable, 'update'], stdin=subprocess.DEVNULL,
+    command = [executable, 'update']
+    if engine == 'dsh':
+        import dsh_installation
+        managed = dsh_installation.update_command(Path(executable))
+        if managed is None or not newer(check(engine)['latest'], row['installed']):
+            raise ValueError('没有已确认的新版本，或独立安装归属已变化；未更新')
+        command = list(managed)
+    result = subprocess.run(command, stdin=subprocess.DEVNULL,
                             capture_output=True, text=True, encoding='utf-8', errors='replace',
                             timeout=300, check=False, start_new_session=True)
     if result.returncode:
@@ -243,3 +254,15 @@ def update(engine: str) -> CliStatus:
     after = status(engine)
     after['updated'] = True
     return after
+
+
+def newer(latest: str, installed: str) -> bool | None:
+    """Do not offer a downgrade from a newer release candidate to npm latest."""
+    def version(value: str) -> tuple[int, int, int, int, str, int] | None:
+        match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z]+)[.-]?(\d+)?)?(?:\+.*)?', value)
+        if match is None:
+            return None
+        major, minor, patch, tag, number = match.groups()
+        return int(major), int(minor), int(patch), int(tag is None), tag or '', int(number or 0)
+    first, second = version(latest), version(installed)
+    return first > second if first is not None and second is not None else None

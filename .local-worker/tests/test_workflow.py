@@ -45,8 +45,9 @@ class WorkflowTests(unittest.TestCase):
     def choose(self, body=None, **kwargs):
         return router.choose(body or self.body, [self.local, self.paid], kwargs.pop('settings', self.on), **kwargs)
 
-    def test_missing_and_corrupt_settings_fail_closed_without_creating_service(self):
-        self.assertFalse(settings.snapshot()['enabled'])
+    def test_fresh_collaboration_default_and_corrupt_settings_fail_closed(self):
+        self.assertTrue(settings.snapshot()['enabled'])
+        self.assertFalse(settings.snapshot()['paid_allowed'])
         self.assertFalse((registry.HERE / 'workflow.json').exists())
         (registry.HERE / 'workflow.json').write_text('{bad', encoding='utf-8')
         state = settings.snapshot()
@@ -67,9 +68,9 @@ class WorkflowTests(unittest.TestCase):
     def test_local_first_and_off_rejects_automatic_but_manual_is_allowed(self):
         self.assertEqual(self.choose()['model_id'], 'local')
         with self.assertRaisesRegex(ValueError, '总开关'):
-            self.choose(settings=settings.DEFAULTS)
+            self.choose(settings={**settings.DEFAULTS, 'enabled': False})
         manual = {**self.body, 'route_mode': 'manual', 'model_id': 'local'}
-        self.assertEqual(self.choose(manual, settings=settings.DEFAULTS)['model_id'], 'local')
+        self.assertEqual(self.choose(manual, settings={**settings.DEFAULTS, 'enabled': False})['model_id'], 'local')
 
     def test_complex_task_routes_paid_with_explained_exclusion(self):
         body = {**self.body, 'routing': {**self.body['routing'], 'category': 'code_multi', 'complexity': 'complex'}}
@@ -198,6 +199,7 @@ class WorkflowTests(unittest.TestCase):
             relay.reserve(run, self.local, {**free, 'enforce_model_call_limit': True}, 1000, 1000)
 
     def test_queued_auto_is_not_started_after_switch_off(self):
+        settings.save_settings({'enabled': False})
         run = registry.task_dir('queued-auto')
         registry.patch_task(run, id='queued-auto', model_id='local', kind='chat', status='queued', engine='dsh', route={'mode': 'auto'})
         with patch.object(panel.subprocess, 'Popen') as process:

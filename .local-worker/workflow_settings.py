@@ -15,7 +15,7 @@ import execution_engines
 
 DEFAULTS = {
     "version": 1,
-    "enabled": False,
+    "enabled": True,
     "paid_allowed": False,
     "enforce_paid_budget": True,
     "enforce_model_call_limit": True,

@@ -427,7 +427,7 @@ def pricing_info(model):
     """Where a price comes from, and whether there is a trustworthy one at all."""
     if not is_paid(model):
         return {'known': True, 'source': 'self_hosted', 'note': '自建模型，无 API 账单'}
-    if model.get('provider') in {'claude_cli', 'codex_cli'}:
+    if model.get('provider') in {'claude_cli', 'codex_cli', 'dsh'}:
         return {'known': False, 'source': 'cli-account', 'note': 'CLI 账户用量与人民币费用未知'}
     if billing.is_official(model):
         return {'known': rates_for(model) is not None, 'source': 'official_schedule',
@@ -495,6 +495,8 @@ def choose(body, models, settings, history=(), daily_remaining=None, moment=None
                 raise ValueError(model_scope.reason(scope, is_paid(model)))
             if not model.get('enabled', True):
                 raise ValueError('模型已停用')
+            if model.get('account_enabled') is False:
+                raise ValueError('模型引用的账户已停用')
             agent, agent_source = execution_engines.resolution(body, settings, model=model)
             execution_endpoints.gate(agent, model, settings, controls=endpoint_controls, automatic=mode == 'auto')
             model = execution_endpoints.apply_preset(model, agent, endpoint_controls)
@@ -545,7 +547,7 @@ def choose(body, models, settings, history=(), daily_remaining=None, moment=None
                                 % (est_output, model_output))
             rates = rates_for(model, moment)
             cap = None
-            native = model.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli'}
+            native = model.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli', 'dsh'}
             if native:
                 if model.get('provider') == 'workbuddy':
                     import workbuddy_worker

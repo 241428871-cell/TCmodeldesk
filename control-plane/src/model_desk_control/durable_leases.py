@@ -73,9 +73,16 @@ def _write(database: Connection, state: DurableLease, previous: DurableLease | N
             "INSERT INTO resource_leases VALUES(?,?,?)", (state.token, state.phase.value, data)
         )
     else:
+        raw = text_cursor(
+            database,
+            "SELECT data FROM resource_leases WHERE token=?", (previous.token,)
+        ).fetchone()
+        if raw is None or DurableLease.model_validate_json(raw[0]) != previous:
+            code = "lease_transition_conflict"
+            raise LeaseStoreError(code)
         changed = database.execute(
             "UPDATE resource_leases SET phase=?,data=? WHERE token=? AND data=?",
-            (state.phase.value, data, previous.token, previous.model_dump_json()),
+            (state.phase.value, data, previous.token, raw[0]),
         )
         if changed.rowcount != 1:
             code = "lease_transition_conflict"
@@ -109,6 +116,9 @@ def reserve(database: Connection, request: LeaseRequest, holder: Owner) -> Durab
             item.account == request.account
             and sum(other.account == request.account for other in requests) >= item.account_limit
         ):
+            return None
+        if (request.model and item.model == request.model
+                and sum(other.model == request.model for other in requests) >= item.model_limit):
             return None
     _write(database, state, None)
     return state

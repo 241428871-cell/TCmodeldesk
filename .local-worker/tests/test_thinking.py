@@ -1,17 +1,18 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-from pathlib import Path
 import sys
 import tempfile
 import threading
 import unittest
-from urllib.request import Request, build_opener, ProxyHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from unittest.mock import patch
+from urllib.request import ProxyHandler, Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import thinking_config as thinking
-import model_registry as registry
-import dsh_worker
 import budget_relay
+import dsh_worker
+import model_registry as registry
+import thinking_config as thinking
 import workflow_settings
 
 
@@ -22,6 +23,14 @@ class ThinkingTests(unittest.TestCase):
         registry.HERE = Path(self.temp.name)
         registry.REGISTRY = registry.HERE / 'models.json'
         registry.RUNS = registry.HERE / 'runs'
+        secrets = {}
+        def protect(value, decrypt=False):
+            if decrypt:
+                return secrets[value]
+            reference = 'thinking-test-' + str(len(secrets))
+            secrets[reference] = value
+            return reference
+        self.enterContext(patch.object(registry, 'protect', protect))
         self.local = {'id': 'test', 'provider': 'local', 'api_base': 'http://127.0.0.1:1234/v1', 'model': 'qwen'}
         self.local['thinking_info'] = {**self.local, 'adapter': 'strata', 'supported': ['default', 'off', 'low', 'medium', 'xhigh'], 'default_effort': 'xhigh', 'default_enabled': True, 'status': 'verified'}
         self.paid = {'provider': 'deepseek', 'api_base': 'https://api.deepseek.com', 'model': 'deepseek-flash'}

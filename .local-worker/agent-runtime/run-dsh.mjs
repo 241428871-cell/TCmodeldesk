@@ -97,7 +97,7 @@ try{
         acpx_record_id:handle.acpxRecordId,models:status.models});
   writeParent(sessionId);
   const modelIds=status.models?.availableModelIds||[];
-  const expected=JSON.stringify(['desk-worker',job.model]);
+  const expected=JSON.stringify([job.provider||'desk-worker',job.model]);
   if(!modelIds.includes(expected)||status.models?.currentModelId!==expected)throw new Error('DSH 未选择指定模型，停止派发');
   await verifyRecordProtection(sessionId);
   if(fs.existsSync(job.cancel_file))throw new Error('任务已取消');

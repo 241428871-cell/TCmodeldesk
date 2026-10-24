@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Final
 
 import cli_worker
+import collaboration_policy
 import continuation_clock
 import delegation_policy
 import dynamic_plan
@@ -115,6 +116,7 @@ def build_context(
             'execution_models': workspace_config.execution_models(project, registry.list_models()['models']),
             'project_guidance': project_guidance(project),
             'engineering_policy': engineering_policy.task_context(project),
+            'collaboration': collaboration_policy.context(project),
             'brain': {'model_id': selection.model_id, 'engine': selection.engine, 'runtime': selection.runtime}}
 
 

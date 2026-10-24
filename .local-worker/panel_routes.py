@@ -5,14 +5,19 @@ from typing import Final
 from urllib.parse import parse_qsl, urlsplit
 
 GET: Final = frozenset(
-    {"/api/workspace", "/api/governance", "/api/engineering-policy", "/api/flow"}
+    {"/api/workspace", "/api/governance", "/api/engineering-policy", "/api/flow", "/api/connection-accounts"}
 )
 POST: Final = frozenset(
     {
         "/api/workspace/projects",
         "/api/workspace/bindings",
+        "/api/workspace/defaults",
         "/api/provider-catalog",
         "/api/accounts/refresh",
+        "/api/connection-accounts",
+        "/api/connection-accounts/delete",
+        "/api/connection-accounts/balance",
+        "/api/collaboration-policy",
         "/api/engineering-policy",
         "/api/governance/goals",
     }

@@ -3,13 +3,13 @@
   const roles = {decision:'决策模型',execution:'执行模型'};
   const roleIcons = {decision:'i-compass',execution:'i-bolt'};
   const descriptions = {decision:'理解需求、制定方案与独立验收',execution:'按任务范围执行、测试并交付结果'};
-  const names = {codex_cli:'Codex CLI',claude_cli:'Claude CLI',deepseek:'DeepSeek'};
+  const names = {codex_cli:'Codex CLI',claude_cli:'Claude CLI',deepseek:'DeepSeek API',dsh:'DSH CLI'};
   const tabNames = {overview:'概览',goal:'目标',tasks:'任务',models:'模型',settings:'设置'};
   let workspace = {projects:[],accounts:{},defaults:{}};
   let selectedBinding = null, pendingAssignment = null, editorAssignment = null, projectAction = 'add';
   let workspaceRequest = null, lastLoaded = 0, menuContext = null, menuReturnFocus = null;
   let libraryRole = 'execution', catalog = null, inspectorDirty = false, lastContentKey = '', settingsDirty = false, lastSettingsKey = '';
-  let activeTab = 'overview';
+  let activeTab = 'overview', collaborationDirty = false;
   try{const saved=sessionStorage.getItem('model-desk.tab');if(tabNames[saved])activeTab=saved;}catch{}
   const catalogs = new Map();
   const sourceDrafts = new Map(), sourceSaving = new Set();
@@ -17,6 +17,7 @@
   const text = value => escapeText(String(value ?? ''));
   const icon = (id,cls='i') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
   const isCli = model => ['codex_cli','claude_cli'].includes(model?.provider);
+  const isDsh = model => model?.provider==='dsh'||effectiveModelAgent(model)==='dsh';
   const boundPath = () => projectView.mode==='project'?projectView.project:null;
   const currentProject = () => workspace.projects.find(p => sameProjectPath(p.path,projectView.project));
   const currentBinding = () => currentProject()?.bindings.find(b => b.id === selectedBinding);
@@ -107,7 +108,7 @@
       try{
         const next=await api('/api/workspace');
         if(!Array.isArray(next.projects))throw new Error('项目配置返回格式不正确');
-        workspace=next;lastLoaded=Date.now();for(const [provider,value] of Object.entries(next.catalogs||{})){if(value.models?.length)catalogs.set(provider,value);}renderAll();
+        workspace=next;window.modelDeskAccounts?.set(next.api_accounts);lastLoaded=Date.now();for(const [provider,value] of Object.entries(next.catalogs||{})){if(value.models?.length)catalogs.set(provider,value);}renderAll();
       }catch(error){if(!error.stale)setMarkup(el('desk-project-tree'),`<p class="sidebar-empty">${text(error.message)}<br><button class="text-button" data-desk-retry>重新读取</button></p>`);}
     })().finally(()=>{workspaceRequest=null;});
     return workspaceRequest;
@@ -202,7 +203,7 @@
     setMarkup(node,`<div class="ov-head"><div><p class="ov-kicker">项目模型</p><h2>${total} 个模型配置</h2><p>“已就绪”只表示可用，不代表已启动。</p></div><button class="text-button" data-desk-tab-jump="models">管理</button></div>${Object.entries(roles).map(([role,label])=>{const rows=project.bindings.filter(b=>b.role===role);return `<div class="ov-role"><div class="ov-role-head"><span>${icon(roleIcons[role])}${label}</span><button class="text-button" data-desk-add-role="${role}" data-project="${text(project.path)}">添加</button></div>${rows.map(b=>`<button class="ov-model" data-desk-select-binding="${b.id}" data-project="${text(project.path)}"><span class="sdot s-${statusKind(b)}" aria-hidden="true"></span><span class="ov-model-main"><strong>${text(modelLabel(b))}${b.is_default?'<span class="desk-default-flag">默认</span>':''}</strong><small>${text(modelOf(b)?.model||'')}${isCli(modelOf(b))?' · effort '+text(b.effort||'medium'):''}</small></span>${statusMarkup(b)}</button>`).join('')||`<p class="ov-empty">尚未添加${label}。</p>`}</div>`;}).join('')}`);
   }
   function roleRow(project,b){
-    return `<div class="desk-role-row ${selectedBinding===b.id?'selected':''}" data-binding-row="${b.id}" data-project="${text(project.path)}"><button data-desk-select-binding="${b.id}" data-project="${text(project.path)}" ${selectedBinding===b.id?'aria-current="true"':''}><span class="sdot s-${statusKind(b)}" aria-hidden="true"></span><span class="role-row-text"><strong>${text(modelLabel(b))}${b.is_default?'<span class="desk-default-flag">默认</span>':''}</strong><small>${text(modelOf(b)?.model||'')} · ${isCli(modelOf(b))?text(b.effort||'medium')+' effort':'连接配置参数'}</small></span>${statusMarkup(b)}</button><button class="tree-menu-button" data-desk-binding-menu="${b.id}" data-project="${text(project.path)}" aria-label="${text(modelLabel(b))}模型操作" aria-haspopup="menu">${icon('i-more')}</button></div>`;
+    return `<div class="desk-role-row ${selectedBinding===b.id?'selected':''}" data-binding-row="${b.id}" data-project="${text(project.path)}"><button data-desk-select-binding="${b.id}" data-project="${text(project.path)}" ${selectedBinding===b.id?'aria-current="true"':''}><span class="sdot s-${statusKind(b)}" aria-hidden="true"></span><span class="role-row-text"><strong>${text(modelLabel(b))}${b.is_default?'<span class="desk-default-flag">默认</span>':''}</strong><small>${text(modelOf(b)?.model||'')} · ${isCli(modelOf(b))?text(b.effort||'medium')+' effort':'项目运行参数'}</small></span>${statusMarkup(b)}</button><button class="tree-menu-button" data-desk-binding-menu="${b.id}" data-project="${text(project.path)}" aria-label="${text(modelLabel(b))}模型操作" aria-haspopup="menu">${icon('i-more')}</button></div>`;
   }
   function renderModelsList(project){
     return Object.entries(roles).map(([role,label])=>{const rows=project.bindings.filter(b=>b.role===role);return `<section class="desk-role-panel" aria-label="${label}"><div class="role-panel-heading"><h3>${icon(roleIcons[role])}${label}<span class="count">${rows.length}</span></h3><button class="button secondary" data-desk-add-role="${role}" data-project="${text(project.path)}">${icon('i-plus')}添加</button></div><p class="desk-role-description">${descriptions[role]}</p>${rows.map(b=>roleRow(project,b)).join('')||`<div class="role-empty">为此项目选择${label}。${role==='decision'?'Claude 或 Codex CLI 可担任主脑，负责拆分与验收。':'可以选择 CLI、API 或本地模型执行任务。'}</div>`}</section>`;}).join('');
@@ -234,10 +235,16 @@
     const project=currentProject(),node=el('desk-project-settings');if(!node)return;
     if(!project){lastSettingsKey='';setMarkup(node,'<div class="settings-card-heading"><h2>本项目执行设置</h2></div><p class="field-hint">项目尚未加入侧栏，暂无项目级设置。</p>');return;}
     const waiting=el('desk-lease-waiting');
-    const key=project.path+':'+(project.work_concurrency||1);
-    if(waiting&&(settingsDirty||key===lastSettingsKey)){setMarkup(waiting,renderLeaseWaits(project));return;}
+    const key=project.path+':'+(project.work_concurrency||1)+JSON.stringify(workspace.collaboration||{});
+    if(waiting&&(settingsDirty||collaborationDirty||key===lastSettingsKey)){setMarkup(waiting,renderLeaseWaits(project));return;}
     lastSettingsKey=key;settingsDirty=false;
-    setMarkup(node,`<div class="settings-card-heading"><h2>本项目执行设置 <span class="scope-tag">仅此项目</span></h2></div><form id="desk-concurrency-form" class="inspector-settings" data-project="${text(project.path)}"><label>工作并发<input name="work_concurrency" type="number" min="1" max="4" step="1" value="${project.work_concurrency||1}" required aria-describedby="desk-concurrency-hint"></label><p id="desk-concurrency-hint" class="field-hint">默认 1，最多 4。同账户最多 1 个任务；写入文件冲突时仍会等待。不同项目、不同账户可同时执行。保存后用于尚未申请资源的任务，不中止在途执行。</p><p id="desk-concurrency-error" class="form-error" role="alert"></p><div class="inspector-save-row"><span id="desk-concurrency-state">设置只影响此项目。</span><button type="submit" class="button primary">保存并发设置</button></div></form><section id="desk-lease-waiting" class="lease-waiting" aria-label="等待资源的任务">${renderLeaseWaits(project)}</section>`);
+    setMarkup(node,`<div class="settings-card-heading"><h2>本项目执行设置 <span class="scope-tag">仅此项目</span></h2></div><form id="desk-concurrency-form" class="inspector-settings" data-project="${text(project.path)}"><label>工作并发<input name="work_concurrency" type="number" min="1" max="64" step="1" value="${project.work_concurrency||1}" required aria-describedby="desk-concurrency-hint"></label><p id="desk-concurrency-hint" class="field-hint">支持 1–64 个独立实例。同一模型可并行；同时受账户与模型实例上限约束，写入文件冲突仍会等待。保存后用于尚未申请资源的任务，不中止在途执行。</p><p id="desk-concurrency-error" class="form-error" role="alert"></p><div class="inspector-save-row"><span id="desk-concurrency-state">设置只影响此项目。</span><button type="submit" class="button primary">保存并发设置</button></div></form><section id="desk-lease-waiting" class="lease-waiting" aria-label="等待资源的任务">${renderLeaseWaits(project)}</section>${window.modelDeskCollaboration?.markup(workspace.collaboration)||''}`);
+  }
+  function renderProjectDefaults(){
+    const project=currentProject(),node=el('desk-project-settings');if(!project||!node)return;
+    if(!el('desk-project-defaults'))node.insertAdjacentHTML('afterbegin',`<section id="desk-project-defaults" class="inspector-settings"><h2>新项目默认配置</h2><p class="field-hint">新项目自动添加相同模型，并沿用已保存的运行参数与并发。不复制目标、记录或账户密钥，已有项目保持自己的设置。</p><p id="desk-project-defaults-state" role="status"></p><button type="button" class="button secondary" data-desk-save-project-defaults>将当前配置存为新项目默认</button></section>`);
+    const saved=workspace.project_defaults||{};
+    el('desk-project-defaults-state').textContent=saved.readable===false?saved.error:saved.configured?`已保存 ${saved.model_count} 个模型 · 并发 ${saved.work_concurrency} · 用于以后新建的项目`:'尚未保存默认模板；新项目使用初始配置。';
   }
   function renderEnforcement(binding){
     const report=binding.enforcement;
@@ -245,15 +252,19 @@
     return `<details class="inspector-settings"><summary>权限约束 · ${text(report.label||'未支持')}</summary><p class="field-hint">适配器声明，未核验本次运行。启用或就绪不代表隔离已经生效。</p>${report.controls?.length?`<ul>${report.controls.map(value=>`<li>${text(value)}</li>`).join('')}</ul>`:''}<h4>覆盖范围与限制</h4><ul>${(report.limitations||[]).map(value=>`<li>${text(value)}</li>`).join('')}</ul></details>`;
   }
   function catalogLine(model){
+    if(!isCli(model)&&model.provider!=='dsh'){
+      const info=model.thinking;
+      return info?.supported?.length>1?`${info.status==='documented'?'官方模型能力说明':'模型能力缓存'}${info.default_effort?' · 默认 '+info.default_effort:''}`:'尚未确认此 API 模型的思考等级，请读取模型能力。';
+    }
     const value=catalogs.get(model.provider);
     if(!value)return '尚未读取原生目录；effort 选项为常见值，以 CLI 实际支持为准。';
     const cap=nativeCapabilities(model);
     return `${value.live?'来自本机 CLI 原生列表':'缓存模型列表'}${value.updated_at?' · '+clock(value.updated_at):''}${cap?'':' · 当前模型不在目录中，按未确认处理'}`;
   }
   function renderInspector(project,binding){
-    const model=modelOf(binding),native=isCli(model),cap=native?nativeCapabilities(model):null;
-    const efforts=cap?.effort_levels?.length?[...cap.effort_levels]:(model?.provider==='claude_cli'?['low','medium','high','xhigh','max']:['low','medium','high','xhigh']);
-    const chosen=binding.effort||'medium';if(!efforts.includes(chosen))efforts.unshift(chosen);
+    const model=modelOf(binding),dsh=isDsh(model),native=isCli(model)||dsh,cap=native?nativeCapabilities(model):null;
+    const efforts=dsh?['default',...(cap?.effort_levels||model?.thinking?.supported?.filter(v=>v!=='default')||[])]:cap?.effort_levels?.length?['default',...cap.effort_levels]:(model?.provider==='claude_cli'?['default','low','medium','high','xhigh','max']:['default','low','medium','high','xhigh']);
+    const chosen=dsh?(binding.thinking_level||model?.thinking_level||'default'):(binding.effort||'medium');if(!efforts.includes(chosen))efforts.unshift(chosen);
     const window=binding.context_window||200000,compact=binding.autocompact_tokens||Math.floor(window*.8);
     const kind=statusKind(binding);
     const activityNote=binding.role==='decision'?(binding.running_count||binding.starting_count||binding.unknown_count?`主脑轮次：${statusName(binding)}。停用只影响之后的选择，不会停止已在进行的轮次。`:'这个配置用于记录项目的决策与验收模型。只有持久轮次取得启动回执后才显示“已启动”。'):binding.running_count?'当前有 '+binding.running_count+' 个任务运行。停用仅阻止新任务，运行中的任务继续。':'CLI 和 API 模型按任务运行。“已就绪”表示配置已启用且执行端可用；有真实任务时才显示“运行中”。';
@@ -261,7 +272,7 @@
     const fastLocked=model?.provider==='codex_cli'&&!binding.fast&&(cap?.fast_supported===false||!fastKnown);
     const fastNote=cap?.fast_supported===false?'此模型没有返回 fast 支持，保持关闭。':!fastKnown?'尚未确认此模型的 fast 能力：先读取原生模型与能力，确认支持后才能开启。':'使用原生快速服务层；可用性与消耗按当前账户和模型计算。';
     const nativeWindow=cap?.context_window?`原生窗口 ${tokens(cap.context_window)} tokens（目录读取值）`:'原生窗口未从目录取得';
-    return `<div class="desk-inspector">${binding.blocked_reason&&!binding.ready?`<p class="desk-inline-note warn">${text(binding.blocked_reason)}${binding.runtime_ready&&!binding.endpoint_enabled?` <button class="text-button" data-desk-enable-endpoint="${text(isCli(model)?model.provider:effectiveModelAgent(model))}">启用此执行端</button>`:''}</p>`:''}<div class="inspector-heading"><div><p class="ov-kicker">${roles[binding.role]} · ${text(names[model?.provider]||engineNames[effectiveModelAgent(model)]||model?.provider||'连接未知')}</p><h2>${text(modelLabel(binding))}</h2><p class="desk-model-code">${text(model?.model||binding.model_id)}</p></div>${statusMarkup(binding)}</div><div class="inspector-toolbar"><button class="button ${binding.enabled?'secondary':'primary'}" data-desk-toggle-binding="${binding.id}">${binding.enabled?'停用此模型':'启用此模型'}</button>${binding.role==='execution'?`<button class="button primary" data-desk-new-task="${binding.id}" ${!binding.enabled||!binding.ready?'disabled title="模型未启用或执行端未就绪"':''}>${icon('i-send')}分派任务</button>`:''}<button class="button secondary" data-desk-binding-flow="${binding.id}" data-project="${text(project.path)}">${icon('i-flow')}查看消息流</button><button class="button secondary" data-desk-edit-connection="${text(binding.model_id)}">编辑连接</button><button class="icon-button" data-desk-binding-menu="${binding.id}" data-project="${text(project.path)}" aria-haspopup="menu" aria-label="更多操作">${icon('i-more')}</button></div><p class="desk-inline-note ${kind==='unknown'?'unknown':''}">${activityNote}</p>${renderEnforcement(binding)}<form id="desk-binding-form" class="inspector-settings" data-binding-id="${binding.id}"><h3>此项目的运行设置</h3><p class="settings-section-note">保存后用于新任务和新会话；已在运行的会话保留启动时的快照，实际生效值见消息流检查器。</p>${native?`<div class="inspector-grid"><label>Effort · 思考强度<select name="effort">${efforts.map(v=>`<option value="${v}" ${v===chosen?'selected':''}>${text({low:'低 · low',medium:'中 · medium',high:'高 · high',xhigh:'超高 · xhigh',max:'最高 · max',default:'沿用原生默认',none:'关闭 · none',minimal:'最少 · minimal',ultra:'极高 · ultra'}[v]||v)}</option>`).join('')}</select><p class="field-hint">${cap?'选项来自本机 CLI 的此模型能力。':'默认使用 medium；读取原生模型能力后按模型选择支持的等级。'}</p></label><div><span class="field-label">模型能力</span><button type="button" class="button secondary" data-desk-inspect-catalog="${model.provider}">${icon('i-refresh')}读取原生模型与能力</button><p class="field-hint">${text(catalogLine(model))}。只读模型元数据，不发送生成请求。</p></div></div>${model.provider==='codex_cli'?`<label class="inspector-check ${fastLocked?'is-disabled':''}"><input name="fast" type="checkbox" ${binding.fast?'checked':''} ${fastLocked?'disabled':''}>开启 Codex fast</label><p class="field-hint">${fastNote} 默认关闭。</p>`:''}<div class="inspector-grid"><label>工作台上下文预算 / tokens<input name="context_window" type="number" min="100000" max="2000000" step="1000" value="${window}" required><p class="field-hint">仅为工作台预算，实际模型窗口以服务商为准；${text(nativeWindow)}。</p></label><label>${model.provider==='claude_cli'?'自动压缩窗口':'自动压缩触发阈值'} / tokens<input name="autocompact_tokens" type="number" min="${model.provider==='claude_cli'?100000:1000}" max="${model.provider==='claude_cli'?1000000:2000000}" step="1000" value="${compact}" required><p class="field-hint">${model.provider==='claude_cli'?'Claude 窗口须为 100k–1M；实际触发会保留原生摘要缓冲。':'达到此 token 数时，交给 Codex 原生压缩。'}默认取预算的 80%。</p></label></div><button type="button" class="text-button" data-desk-reset-compact>设为预算的 80%</button><p class="effective-line"><span>已保存：</span><b>effort ${text(binding.effort||'medium')}</b>${model.provider==='codex_cli'?`<b>fast ${binding.fast?'开':'关'}</b>`:''}<b>预算 ${tokens(binding.context_window)}</b><b>压缩 ${tokens(binding.autocompact_tokens)}</b></p>`:`<p class="field-hint">API / 本地模型的 token 与思考等级使用现有连接配置；在“编辑连接”中设置。CLI 专属 effort、fast 和自动压缩不应用到 API 请求。</p>`}<label class="inspector-check"><input name="is_default" type="checkbox" ${binding.is_default?'checked':''}>设为本项目的默认${roles[binding.role]}</label><p id="desk-binding-error" class="form-error" role="alert"></p><div class="inspector-save-row"><span id="desk-binding-save-state">${binding.role==='decision'?'设置只作用于新轮次；进行中的轮次保留启动时的快照。':'设置只作用于新任务；已有任务保留派发时的快照。'}</span><button type="button" class="button secondary" data-desk-revert>还原</button><button type="submit" class="button primary">保存设置</button></div></form></div>`;
+    return `<div class="desk-inspector">${binding.blocked_reason&&!binding.ready?`<p class="desk-inline-note warn">${text(binding.blocked_reason)}${binding.runtime_ready&&!binding.endpoint_enabled?` <button class="text-button" data-desk-enable-endpoint="${text(isCli(model)?model.provider:effectiveModelAgent(model))}">启用此执行端</button>`:''}</p>`:''}<div class="inspector-heading"><div><p class="ov-kicker">${roles[binding.role]} · ${text(names[model?.provider]||engineNames[effectiveModelAgent(model)]||model?.provider||'连接未知')}</p><h2>${text(modelLabel(binding))}</h2><p class="desk-model-code">${text(model?.model||binding.model_id)}</p></div>${statusMarkup(binding)}</div><div class="inspector-toolbar"><button class="button ${binding.enabled?'secondary':'primary'}" data-desk-toggle-binding="${binding.id}">${binding.enabled?'停用此模型':'启用此模型'}</button>${binding.role==='execution'?`<button class="button primary" data-desk-new-task="${binding.id}" ${!binding.enabled||!binding.ready?'disabled title="模型未启用或执行端未就绪"':''}>${icon('i-send')}分派任务</button>`:''}<button class="button secondary" data-desk-binding-flow="${binding.id}" data-project="${text(project.path)}">${icon('i-flow')}查看消息流</button><button class="button secondary" data-desk-edit-connection="${text(binding.model_id)}">编辑模型</button><button class="icon-button" data-desk-binding-menu="${binding.id}" data-project="${text(project.path)}" aria-haspopup="menu" aria-label="更多操作">${icon('i-more')}</button></div><p class="desk-inline-note ${kind==='unknown'?'unknown':''}">${activityNote}</p>${renderEnforcement(binding)}<form id="desk-binding-form" class="inspector-settings" data-binding-id="${binding.id}"><h3>此项目的运行设置</h3><p class="settings-section-note">保存后用于新任务和新会话；已在运行的会话保留启动时的快照，实际生效值见消息流检查器。</p>${native?`<div class="inspector-grid"><label>Effort · 思考强度<select name="${dsh?'thinking_level':'effort'}">${efforts.map(v=>`<option value="${v}" ${v===chosen?'selected':''}>${text({low:'低 · low',medium:'中 · medium',high:'高 · high',xhigh:'超高 · xhigh',max:'最高 · max',default:'沿用原生默认',off:'关闭 · off',none:'关闭 · none',minimal:'最少 · minimal',ultra:'极高 · ultra'}[v]||v)}</option>`).join('')}</select><p class="field-hint">${cap?'选项来自本机 CLI 的此模型能力。':dsh?'选项来自所选模型的能力声明；未知时只提供默认。':'读取原生目录后按模型选择支持的等级。'}</p></label><div><span class="field-label">模型能力</span><button type="button" class="button secondary" ${dsh&&model.provider!=='dsh'?`data-desk-thinking-model="${model.id}"`:`data-desk-inspect-catalog="${model.provider}"`}>${icon('i-refresh')}读取原生模型与能力</button><p class="field-hint">${text(catalogLine(model))}。只读模型元数据，不发送生成请求。</p></div></div>${model.provider==='codex_cli'?`<label class="inspector-check ${fastLocked?'is-disabled':''}"><input name="fast" type="checkbox" ${binding.fast?'checked':''} ${fastLocked?'disabled':''}>开启 Codex fast</label><p class="field-hint">${fastNote} 默认关闭。</p>`:''}<div class="inspector-grid"><label>工作台上下文预算 / tokens<input name="context_window" type="number" min="1024" max="2000000" step="1" value="${window}" required><p class="field-hint">仅为工作台预算，实际模型窗口以服务商为准；${text(nativeWindow)}。</p></label><label>${model.provider==='claude_cli'?'自动压缩窗口':'自动压缩触发阈值'} / tokens<input name="autocompact_tokens" type="number" min="${model.provider==='claude_cli'?100000:1024}" max="${model.provider==='claude_cli'?1000000:2000000}" step="1" value="${compact}" required><p class="field-hint">${model.provider==='claude_cli'?'Claude 窗口须为 100k–1M；实际触发会保留原生摘要缓冲。':dsh?'交给 DSH 原生 compaction-basic；实际触发还会为模型输出预留空间。':'达到此 token 数时，交给 Codex 原生压缩。'}默认取预算的 80%。</p></label></div><button type="button" class="text-button" data-desk-reset-compact>设为预算的 80%</button><p class="effective-line"><span>已保存：</span><b>effort ${text(dsh?(binding.thinking_level||'default'):(binding.effort||'medium'))}</b>${model.provider==='codex_cli'?`<b>fast ${binding.fast?'开':'关'}</b>`:''}<b>预算 ${tokens(binding.context_window)}</b><b>压缩 ${tokens(binding.autocompact_tokens)}</b></p>`:`<p class="field-hint">此执行端尚未接入项目级思考与压缩参数，保留原有模型默认值。Codex fast 只用于 Codex CLI。</p>`}<label>本项目分工提示<textarea name="collaboration_hint" rows="4" maxlength="12000" placeholder="例如：负责前端交互；验收时优先检查边界条件。">${text(binding.collaboration_hint||'')}</textarea><span class="field-hint">主脑拆分与选模型时读取此提示；执行实例也会收到。它不扩大权限或费用授权。</span></label>${binding.role==='execution'?`<label>此模型的并行实例上限<input name="max_instances" type="number" min="1" max="64" step="1" value="${binding.max_instances||8}" required><span class="field-hint">实例按任务分别创建；不需要重复添加同一个模型。</span></label>`:''}<label class="inspector-check"><input name="is_default" type="checkbox" ${binding.is_default?'checked':''}>设为本项目的默认${roles[binding.role]}</label><p id="desk-binding-error" class="form-error" role="alert"></p><div class="inspector-save-row"><span id="desk-binding-save-state">${binding.role==='decision'?'设置只作用于新轮次；进行中的轮次保留启动时的快照。':'设置只作用于新任务；已有任务保留派发时的快照。'}</span><button type="button" class="button secondary" data-desk-revert>还原</button><button type="submit" class="button primary">保存设置</button></div></form></div>`;
   }
   function renderTabBadges(project){
     const rows=project?.bindings||[];
@@ -270,7 +281,7 @@
   }
   function renderAll(){
     const project=currentProject();
-    renderHeader(project);renderWelcome();renderTree();renderAccounts();renderAccountSummary();renderProjectContent();renderSettings();renderOverviewModels(project);renderTabBadges(project);
+    renderHeader(project);renderWelcome();renderTree();renderAccounts();renderAccountSummary();renderProjectContent();renderSettings();renderProjectDefaults();renderOverviewModels(project);renderTabBadges(project);
     const rows=(project?.bindings||[]).filter(b=>b.role==='execution');
     el('stat-models').textContent=project?rows.filter(b=>b.enabled).length:'—';el('model-caption').textContent=project?`/ ${rows.length} 个项目执行模型`:'项目未加入侧栏';
     if(el('desk-library-dialog').open)renderLibrary();if(el('desk-engines-dialog').open)renderEngines();
@@ -299,8 +310,8 @@
   function renderLibrary(){
     const project=currentProject();
     el('desk-library-title').textContent=pendingAssignment?'为项目添加'+roles[pendingAssignment.role]:'连接与模型库';
-    el('desk-library-hint').textContent=pendingAssignment?'选择已有连接，或从本机 CLI 读取并导入模型。连接凭据共享，项目角色和运行参数独立。':'连接库保存账户与接口。项目侧栏只显示加入该项目的模型；同一连接可以用于多个项目和角色。';
-    setMarkup(el('desk-library-list'),state.models.map(model=>`<div class="desk-library-row"><div><strong>${text(model.name)}</strong><p>${text(names[model.provider]||model.provider)} · ${text(model.model)}${model.enabled?'':' · 已停用'}</p></div><button class="button secondary" data-desk-edit-connection="${text(model.id)}">配置</button>${pendingAssignment?`<button class="button primary" data-desk-assign-model="${text(model.id)}">加入${roles[pendingAssignment.role]}</button>`:project?`<button class="button secondary" data-desk-model-project="${text(model.id)}">加入项目…</button>`:''}</div>`).join('')||'<p class="role-empty">还没有保存的连接。读取 Claude / Codex 原生模型，或添加 API 与本地服务。</p>');
+    el('desk-library-hint').textContent=pendingAssignment?'选择已有连接，或从本机 CLI 读取并导入模型。连接凭据共享，项目角色和运行参数独立。':'账户管理独立保存密钥；这里管理模型目录。将模型加入项目后，分别设置分工与运行参数。';
+    setMarkup(el('desk-library-list'),state.models.map(model=>`<div class="desk-library-row"><div><strong>${text(model.name)}</strong><p>${text(names[model.provider]||model.provider)} · ${text(model.model)}${model.enabled?'':' · 已停用'}</p></div><button class="button secondary" data-desk-edit-connection="${text(model.id)}">配置</button>${pendingAssignment?`<button class="button primary" data-desk-assign-model="${text(model.id)}">加入${roles[pendingAssignment.role]}</button>`:project?`<button class="button secondary" data-desk-model-project="${text(model.id)}">加入项目…</button>`:''}</div>`).join('')||'<p class="role-empty">还没有保存的连接。读取 Claude / Codex / DSH 原生模型，或先添加 API 账户再选择模型。</p>');
   }
   async function readCatalog(provider,button,inspector=false){
     const label=button.innerHTML;button.disabled=true;button.textContent='读取中…';
@@ -381,7 +392,7 @@
     let markup;
     if(binding){
       const other=binding.role==='decision'?'execution':'decision';
-      markup=`<p class="menu-label">${text(modelLabel(binding))} · ${roles[binding.role]}</p>${item('settings','运行设置')}${item('flow','查看消息流与控制…')}${binding.role==='execution'?item('task','用此模型分派任务…',{disabled:!binding.enabled||!binding.ready?'模型未启用或执行端未就绪':''}):''}<hr>${item(binding.enabled?'disable':'enable',binding.enabled?'停用此模型':'启用此模型')}${item('default','设为此角色默认',{disabled:binding.is_default?'已是此角色默认':''})}${item('copy-role','复制到'+roles[other])}${item('edit','编辑连接')}<hr>${item('remove-binding','移除项目关联',{destructive:true})}`;
+      markup=`<p class="menu-label">${text(modelLabel(binding))} · ${roles[binding.role]}</p>${item('settings','运行设置')}${item('flow','查看消息流与控制…')}${binding.role==='execution'?item('task','用此模型分派任务…',{disabled:!binding.enabled||!binding.ready?'模型未启用或执行端未就绪':''}):''}<hr>${item(binding.enabled?'disable':'enable',binding.enabled?'停用此模型':'启用此模型')}${item('default','设为此角色默认',{disabled:binding.is_default?'已是此角色默认':''})}${item('copy-role','复制到'+roles[other])}${item('edit','编辑模型')}<hr>${item('remove-binding','移除项目关联',{destructive:true})}`;
     }else markup=`<p class="menu-label">${text(project?.name||'项目')}</p>${item('open','打开项目')}${item('add-decision','添加决策模型')}${item('add-execution','添加执行模型')}<hr>${item('rename','重命名项目')}${item('remove-project','从侧栏移除',{destructive:true})}`;
     const node=el('desk-context-menu');node.innerHTML=markup;
     node.hidden=false;placeMenu(node,anchor,event);node.querySelector('button:not(:disabled)')?.focus();
@@ -418,7 +429,7 @@
   function startTask(binding){openTask();if(el('task-dialog').open){el('task-route').value='manual';el('task-model').value=binding.model_id;routeFields();}}
   async function refreshAccount(provider,button){
     button.disabled=true;button.textContent='读取中…';
-    try{await api('/api/accounts/refresh',{provider});await loadWorkspace(true);}
+    try{await api('/api/accounts/refresh',{provider});await refresh();await loadWorkspace(true);}
     catch(error){toast(error.message,true);}finally{button.disabled=false;button.textContent='刷新';}
   }
   function openAccounts(){renderAccounts();if(!el('desk-accounts-dialog').open)el('desk-accounts-dialog').showModal();}
@@ -429,6 +440,13 @@
     if(!el('desk-appearance').hidden&&!event.target.closest('#desk-appearance,#desk-appearance-open'))toggleAppearance(false);
     if(!button)return;
     try{
+      if(button.hasAttribute('data-desk-save-project-defaults')){
+        if(inspectorDirty||settingsDirty||collaborationDirty)throw new Error('请先保存尚未保存的运行或协作设置，再更新默认模板。');
+        button.disabled=true;
+        try{await api('/api/workspace/defaults',{project:projectView.project});await loadWorkspace(true);toast('已存为新项目默认；已有项目不变');}
+        finally{if(button.isConnected)button.disabled=false;}
+        return;
+      }
       if(button.hasAttribute('data-desk-close')){button.closest('dialog').close();return;}
       if(button.hasAttribute('data-desk-retry'))return loadWorkspace(true);
       if(button.hasAttribute('data-desk-add-project'))return openProjectDialog();
@@ -447,6 +465,7 @@
       if(button.hasAttribute('data-desk-binding-flow')){const binding=currentBinding();return await openBindingFlow(button.dataset.project,binding);}
       if(button.hasAttribute('data-desk-edit-connection')){editorAssignment=null;el('desk-library-dialog').close();openModel(button.dataset.deskEditConnection);return;}
       if(button.hasAttribute('data-desk-catalog'))return await readCatalog(button.dataset.deskCatalog,button);
+      if(button.hasAttribute('data-desk-thinking-model')){await api(`/api/models/${encodeURIComponent(button.dataset.deskThinkingModel)}/thinking`,{});inspectorDirty=false;lastContentKey='';await refresh();await loadWorkspace(true);return;}
       if(button.hasAttribute('data-desk-inspect-catalog'))return await readCatalog(button.dataset.deskInspectCatalog,button,true);
       if(button.hasAttribute('data-desk-assign-model'))return await assignModel(button.dataset.deskAssignModel);
       if(button.hasAttribute('data-desk-model-project')){const model=button.dataset.deskModelProject;openMenu({project:projectView.project},button);el('desk-context-menu').innerHTML=`<button role="menuitem" data-desk-quick-assign="decision" data-model="${text(model)}">加入决策模型</button><button role="menuitem" data-desk-quick-assign="execution" data-model="${text(model)}">加入执行模型</button>`;el('desk-context-menu').querySelector('button').focus();return;}
@@ -528,14 +547,20 @@
   });
   document.addEventListener('input',event=>{
     if(event.target.closest('#desk-concurrency-form')){settingsDirty=true;const node=el('desk-concurrency-state');node.textContent='有未保存的修改';node.classList.add('dirty');}
+    if(event.target.closest('#desk-collaboration-form'))collaborationDirty=true;
   });
   document.addEventListener('submit',async event=>{
     if(event.target.id!=='desk-binding-form')return;event.preventDefault();const form=event.target,button=event.submitter;button.disabled=true;
     try{
       const binding=currentBinding(),values={action:'save',project:projectView.project,binding_id:binding.id,role:binding.role,model_id:binding.model_id,is_default:form.elements.is_default.checked};
-      if(isCli(modelOf(binding)))Object.assign(values,{effort:form.elements.effort.value,fast:form.elements.fast?.checked||false,context_window:Number(form.elements.context_window.value),autocompact_tokens:Number(form.elements.autocompact_tokens.value)});
+      if(isCli(modelOf(binding))||isDsh(modelOf(binding)))Object.assign(values,{...(isDsh(modelOf(binding))?{thinking_level:form.elements.thinking_level.value}:{effort:form.elements.effort.value}),fast:form.elements.fast?.checked||false,context_window:Number(form.elements.context_window.value),autocompact_tokens:Number(form.elements.autocompact_tokens.value)});
+      Object.assign(values,{collaboration_hint:form.elements.collaboration_hint.value,...(form.elements.max_instances?{max_instances:Number(form.elements.max_instances.value)}:{})});
       await api('/api/workspace/bindings',values);inspectorDirty=false;lastContentKey='';await loadWorkspace(true);el('desk-binding-save-state').textContent='已保存 · 新任务将使用此配置';
     }catch(error){el('desk-binding-error').textContent=error.message;}finally{button.disabled=false;}
+  });
+  document.addEventListener('desk-collaboration-saved',event=>{
+    workspace.collaboration=event.detail;collaborationDirty=false;
+    const project=currentProject();if(project)lastSettingsKey=project.path+':'+(project.work_concurrency||1)+JSON.stringify(workspace.collaboration);
   });
   el('desk-project-form').onsubmit=async event=>{
     event.preventDefault();const button=event.submitter;button.disabled=true;el('desk-project-error').textContent='';
@@ -578,7 +603,7 @@
     discover:async provider=>{const result=await api('/api/provider-catalog',{provider});catalogs.set(provider,result);if(result.error)throw new Error(result.error);return result;}
   };
   document.addEventListener('desk-state',()=>{loadWorkspace();renderAccountSummary();if(el('desk-engines-dialog').open)renderEngines();});
-  document.addEventListener('desk-project-changing',()=>{settingsDirty=false;lastSettingsKey='';renderHeader(null);});
+  document.addEventListener('desk-project-changing',()=>{settingsDirty=false;collaborationDirty=false;lastSettingsKey='';renderHeader(null);});
   setTab(activeTab);renderHeader(null);renderWelcome();
   // A native account request remains explicit; first paint only reads local snapshots.
   loadWorkspace(true);

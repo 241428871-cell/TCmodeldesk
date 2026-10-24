@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Final, Literal, TypedDict, assert_never
+from typing import Final, Literal, NotRequired, TypedDict, assert_never
 from uuid import uuid4
 
 import model_registry as registry
@@ -14,7 +14,7 @@ CONFIG_NAME: Final = 'workspace.json'
 Role = Literal['decision', 'execution']
 EFFORTS: Final = ('default', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')
 ROLES: Final = ('decision', 'execution')
-MAX_WORK_CONCURRENCY: Final = 4
+MAX_WORK_CONCURRENCY: Final = 64
 
 
 class ProjectAction(StrEnum):
@@ -44,6 +44,9 @@ class Runtime(TypedDict):
     fast: bool
     autocompact_tokens: int | None
     context_window: int
+    thinking_level: NotRequired[str]
+    collaboration_hint: NotRequired[str]
+    max_instances: NotRequired[int]
 
 
 class Binding(Runtime):
@@ -85,6 +88,9 @@ class Mutation(TypedDict, total=False):
     context_window: int
     is_default: bool
     work_concurrency: int
+    thinking_level: str
+    collaboration_hint: str
+    max_instances: int
 
 
 def defaults() -> Runtime:
@@ -109,8 +115,29 @@ def runtime(values: Mutation, model: dict) -> Runtime:
         raise WorkspaceError('Claude CLI 不支持此 effort；请选择 low/medium/high/xhigh/max 或默认')
     if model.get('provider') == 'claude_cli' and compact is not None and not 100000 <= compact <= 1000000:
         raise WorkspaceError('Claude CLI 自动压缩阈值需要在 100000 到 1000000 tokens 之间')
-    return {'effort': effort, 'fast': fast, 'autocompact_tokens': compact,
-            'context_window': context}
+    result: Runtime = {'effort': effort, 'fast': fast, 'autocompact_tokens': compact,
+                       'context_window': context}
+    if 'thinking_level' in values:
+        import thinking_config
+        level = values['thinking_level']
+        if model.get('provider') == 'dsh' and level != 'default':
+            import provider_accounts
+            if not provider_accounts.catalog_snapshot('dsh').get('models'):
+                provider_accounts.catalog('dsh')
+        if level not in thinking_config.profile(model)['supported']:
+            raise WorkspaceError('此模型尚未声明支持所选思考等级，请先读取模型能力')
+        result['thinking_level'] = level
+    if 'collaboration_hint' in values:
+        hint = values['collaboration_hint']
+        if not isinstance(hint, str) or len(hint) > 12000:
+            raise WorkspaceError('分工提示须为不超过 12000 字的文字')
+        result['collaboration_hint'] = hint.strip()
+    if 'max_instances' in values:
+        limit = values['max_instances']
+        if type(limit) is not int or not 1 <= limit <= MAX_WORK_CONCURRENCY:
+            raise WorkspaceError('模型并行实例上限须为 1 到 64')
+        result['max_instances'] = limit
+    return result
 
 
 def _path(value: str, *, existing: bool = True) -> str:
@@ -151,7 +178,7 @@ def _read() -> Store:
             'hidden_projects': [p for p in value.get('hidden_projects', []) if isinstance(p, str)],
             'projects': [{'path': p['path'], 'name': p['name'], 'managed': p.get('managed', True),
                           'work_concurrency': p.get('work_concurrency', 1), 'bindings': [
-                {key: b[key] for key in Binding.__annotations__} for b in p['bindings']]} for p in value['projects']]}
+                {key: b[key] for key in Binding.__annotations__ if key in b} for b in p['bindings']]} for p in value['projects']]}
 
 
 def _with_legacy(store: Store) -> Store:
@@ -176,10 +203,15 @@ def update_project(body: Mutation) -> Store:
         match action:
             case ProjectAction.ADD | ProjectAction.SELECT:
                 if project is None:
+                    import project_defaults
+                    concurrency, bindings = project_defaults.new_project()
                     project = {'path': path, 'name': Path(path).name, 'managed': True,
-                               'work_concurrency': 1, 'bindings': []}
+                               'work_concurrency': concurrency, 'bindings': bindings}
                     store['projects'].append(project)
                 if action == ProjectAction.ADD:
+                    if not project['managed'] and not project['bindings']:
+                        import project_defaults
+                        project['work_concurrency'], project['bindings'] = project_defaults.new_project()
                     project['managed'] = True
                 store['selected_project'] = path
                 store['hidden_projects'] = [p for p in store['hidden_projects'] if p != path]
@@ -293,7 +325,7 @@ def execution_models(project: str, models: list[dict]) -> list[dict]:
 
 
 def work_concurrency(project: str) -> int:
-    """Explicit per-project worker limit; every project and legacy bookmark defaults to one."""
+    """Explicit project worker capacity; new projects use eight, legacy entries retain one."""
     if not project:
         return 1
     path = _path(project)
@@ -326,5 +358,9 @@ def project_config(project: str) -> Project | None:
 
 def snapshot(tasks: list[dict] | None = None) -> dict:
     """Return project tree with separate enabled, available and running facts."""
+    import project_defaults
+    import thinking_config
     import workspace_status
-    return workspace_status.snapshot(_with_legacy(_read()), registry.list_models()['models'], tasks or [], defaults())
+    models = thinking_config.enrich(registry.list_models())['models']
+    return {**workspace_status.snapshot(_with_legacy(_read()), models, tasks or [], defaults()),
+            'project_defaults': project_defaults.status()}

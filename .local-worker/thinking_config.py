@@ -58,6 +58,14 @@ class ThinkingUnavailable(ThinkingError):
 
 
 def profile(model):
+    if model.get('provider') == 'dsh':
+        import provider_accounts
+        catalog = provider_accounts.catalog_snapshot('dsh')
+        entry = next((row for row in catalog.get('models', []) if row['id'] == model.get('model')), None)
+        return {'adapter': 'dsh-native', 'supported': ['default', *(entry['effort_levels'] if entry else [])],
+                'selected': model.get('thinking_level', 'default'), 'label': 'DSH 项目思考强度',
+                'status': STATUS_VERIFIED if entry else STATUS_UNKNOWN,
+                'note': '等级来自 DSH 精确模型目录；在项目运行设置中保存，不修改账户密钥。'}
     if model.get('provider') in {'claude_cli', 'codex_cli'}:
         return {'adapter': 'native-cli', 'supported': ['default'], 'selected': 'default',
                 'label': 'CLI 项目 effort', 'status': STATUS_UNKNOWN,

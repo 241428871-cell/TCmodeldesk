@@ -172,13 +172,34 @@ def policy_snapshot(project: str = '') -> dict:  # noqa: DICT_OK - immutable JSO
               'note': '此处是当前可选规则；实际任务保存各自加载快照。修改不改写既有任务，也不授予执行或费用权限。'}
     encoded = json.dumps({key: result[key] for key in ('revision', 'project', 'effective_mode', 'effective_rules')},
                          sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    result['snapshot_id'] = hashlib.sha256(encoded).hexdigest()
+    import collaboration_policy
+    delivery = collaboration_policy.snapshot()['skill_mode']
+    result['delivery'] = delivery
+    result['snapshot_id'] = hashlib.sha256(encoded + (':' + delivery).encode()).hexdigest()
     return result
 
 
 def task_context(project: str = '') -> dict:  # noqa: DICT_OK - caller persists this snapshot on its new task.
     """Return an isolated prompt/snapshot for a new task; snapshots grant no authority."""
     snapshot = policy_snapshot(project)
+    import collaboration_policy
+    delivery = collaboration_policy.snapshot()['skill_mode']
+    if delivery != 'inline':
+        # UI catalogs contain the complete templates; native task contexts do
+        # not need those bodies merely to ask the CLI to load its installed skill.
+        snapshot.pop('available_rules', None)
+        snapshot['effective_rules'] = [{key: row[key] for key in ('id', 'title', 'source')}
+                                       for row in snapshot['effective_rules']]
+        snapshot['delivery'] = delivery
+        cue = ('请使用已安装的 tcauto（TCAUTO）skill 完成本次分配的任务。先读取实际 SKILL.md；'
+               '如果未找到或不支持技能入口，明确记录未加载，不得声称已应用。'
+               '跨模型调度、独立验收与续接由工作台负责；不要另建定时器、重复派发或自行扩大授权。'
+               '当前用户需求与项目准则优先。') if delivery == 'native' else ''
+        if delivery == 'native' and snapshot.get('effective_mode') != 'off':
+            custom = snapshot['custom_rules'] if snapshot['configured_mode'] == 'custom' else snapshot['global_custom_rules']
+            if custom:
+                cue += '\n用户明确保存的自定义工程要求：\n' + custom
+        return {'prompt': cue, 'snapshot': snapshot, 'snapshot_id': snapshot['snapshot_id']}
     rules = snapshot['effective_rules']
     prompt = ''
     if rules:

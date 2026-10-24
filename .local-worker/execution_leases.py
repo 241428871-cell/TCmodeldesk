@@ -77,13 +77,16 @@ class LeaseModel(BaseModel):
     api_base: str = ""
     id: str = ""
     model: str = ""
+    account_id: str = ""
 
 
 def account_key(model: Record) -> str:
     """Native logins share one slot; API hosts conservatively share one slot."""
     parsed = LeaseModel.model_validate(model)
     provider = parsed.provider
-    if provider in {"claude_cli", "codex_cli"}:
+    if parsed.account_id:
+        return 'api-account:' + parsed.account_id
+    if provider in {"claude_cli", "codex_cli", "dsh"}:
         return provider
     host = urlparse(parsed.api_base).hostname
     if provider == "local" or not host:
@@ -104,13 +107,22 @@ def request_for(state: Record, model: Record) -> LeaseRequest:
         else ()
     )
     limit = workspace_config.work_concurrency(str(project)) if project else 1
+    import collaboration_policy
+    binding_runtime = state.get('cli_runtime') or {}
+    stored = state.get('execution_lease')
+    # Legacy in-flight reservations keep the capacities captured before this
+    # release. Changing preferences never mutates an already-running instance.
+    previous = LeaseRequest.model_validate_json(stored) if isinstance(stored, str) else None
     return LeaseRequest(
         owner=task.id,
         project=str(project) if project else "(unbound)",
         account=account_key(model),
         files=files,
         exclusive=writes and not files,
-        project_limit=limit,
+        project_limit=previous.project_limit if previous else limit,
+        account_limit=previous.account_limit if previous else int(collaboration_policy.snapshot()['account_concurrency']),
+        model=previous.model if previous else str(project or '(unbound)') + ':' + str(model.get('id', '')),
+        model_limit=previous.model_limit if previous else int(binding_runtime.get('max_instances', 8)),
     )
 
 
