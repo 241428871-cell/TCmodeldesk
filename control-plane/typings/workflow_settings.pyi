@@ -1,0 +1,6 @@
+# Settings persistence seam used by tests; temporary homes exercise the implementation.
+
+from pydantic import JsonValue
+
+def snapshot() -> dict[str, JsonValue]: ...
+def save_settings(body: dict[str, JsonValue]) -> dict[str, JsonValue]: ...

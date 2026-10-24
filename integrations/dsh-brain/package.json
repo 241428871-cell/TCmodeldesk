@@ -1,0 +1,54 @@
+{
+  "name": "model-desk-dsh-brain",
+  "version": "0.2.12",
+  "private": true,
+  "description": "Optional DSH native main-brain adapter for the local Model Desk workbench",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "index.cjs",
+  "exports": {
+    ".": "./index.cjs",
+    "./account": "./account.cjs",
+    "./account.cjs": "./account.cjs",
+    "./wakeup.cjs": "./wakeup.cjs",
+    "./client": "./client.mjs",
+    "./index.cjs": "./index.cjs",
+    "./client.mjs": "./client.mjs",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "files": [
+    "index.cjs",
+    "account.cjs",
+    "wakeup.cjs",
+    "client.mjs",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-mcp-client": "^0.2.1-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-mcp-client": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  }
+}

@@ -1,0 +1,3 @@
+from pydantic import JsonValue
+
+def suspend_owned(project: str, goal_id: str, driver_id: str) -> dict[str, JsonValue] | None: ...

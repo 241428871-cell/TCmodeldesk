@@ -1,0 +1,149 @@
+[project]
+name = "model-desk-control"
+version = "0.1.0"
+description = "Native CLI orchestration contracts for Model Desk"
+requires-python = ">=3.12"
+dependencies = [
+  "langgraph==1.2.16",
+  "langgraph-checkpoint-sqlite>=3,<4",
+  "pydantic>=2.12,<3",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.12", "basedpyright>=1.30"]
+workbench = [
+  "anyio==4.12.1",
+  "mcp==1.30.0",
+  "psutil==7.2.2",
+  "tiktoken==0.12.0",
+  "PyYAML==6.0.3",
+  "keyring==25.6.0; sys_platform == 'darwin'",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/model_desk_control"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers -q"
+testpaths = ["tests"]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.12"
+include = ["src", "tests"]
+stubPath = "typings"
+extraPaths = ["../.local-worker", "../.local-worker/tests"]
+reportUnusedCallResult = "warning"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "D203", "D213", "CPY001"]
+# Intentional punctuation in the Chinese product interface.
+allowed-confusables = ["，", "；", "："]
+
+[tool.ruff.lint.per-file-ignores]
+"**/goal_requirements.py" = ["INP001"]
+"**/goal_interactions.py" = ["INP001"]
+"**/test_goal_interactions.py" = ["INP001", "E402", "D", "S101", "PLC0414", "PLR2004"]
+"**/lease_stop.py" = ["INP001"]
+"**/test_lease_stop.py" = ["INP001", "E402", "D", "S101", "PLC0414"]
+"**/lease_descendants.py" = ["INP001"]
+"**/test_lease_descendants.py" = ["INP001", "E402", "D", "S101", "PLC0414"]
+"**/resource_evidence.py" = ["INP001"]
+"**/test_resource_evidence.py" = ["INP001", "E402", "D", "S101", "PLC0414", "PLR2004"]
+"**/lease_storage.py" = ["INP001"]
+"**/lease_runtime.py" = ["INP001"]
+"**/lease_processes.py" = ["INP001"]
+"**/lease_runner.py" = ["INP001", "E402"]
+"**/lease_guard.py" = ["INP001", "PLC0415"]
+"**/test_persistent_execution.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_lease_runtime.py" = ["INP001", "E402", "D", "S101", "PLR2004"]
+"**/test_lease_gates.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_lease_controller_exit.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/enforcement_report.py" = ["INP001", "PLC0415"]
+"**/goal_handoff.py" = ["INP001", "PLC0415"]
+"**/test_goal_handoff.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/execution_leases.py" = ["INP001", "E402", "PLC0415"]
+"**/test_execution_leases.py" = ["INP001", "E402", "D", "S101", "PLR2004"]
+"**/test_lease_boundaries.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_lease_worker_identity.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_cli_merge.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/cli_writeback.py" = ["INP001", "E402"]
+"**/test_cli_writeback_recovery.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"tests/**/*.py" = ["S101", "D", "PLR2004"]
+# These entrypoints live in the existing script directory rather than a Python package.
+"**/control_bootstrap.py" = ["INP001"]
+"**/goal_graph_bridge.py" = ["INP001"]
+# Panel adapters bind this installation before loading the bundled package.
+"**/flow_api.py" = ["INP001", "PLC0415"]
+"**/goal_file_scope.py" = ["INP001", "PLC0415"]
+"**/goal_effects.py" = ["INP001", "PLC0415"]
+"**/goal_resume.py" = ["INP001"]
+"**/goal_scan.py" = ["INP001"]
+"**/goal_events.py" = ["INP001", "PLC0415"]
+"**/task_queue.py" = ["INP001", "PLC0415"]
+"**/task_queue_driver.py" = ["INP001", "PLC0415"]
+"**/task_queue_recovery.py" = ["INP001", "PLC0415"]
+"**/task_initialization.py" = ["INP001", "PLC0415"]
+"**/task_initialization_parent.py" = ["INP001", "PLC0415"]
+"**/task_graph_bridge.py" = ["INP001", "PLC0415"]
+"**/goal_settlement.py" = ["INP001", "PLC0415"]
+"**/goal_resolution.py" = ["INP001", "PLC0415"]
+"**/cli_launch.py" = ["INP001"]
+"**/panel_bundle.py" = ["INP001"]
+"**/panel_routes.py" = ["INP001"]
+"**/decision_scope.py" = ["INP001", "PLC0415"]
+"**/decision_grants.py" = ["INP001", "PLC0415"]
+# Preserve the public refusal class names already used by the panel and both brain hosts.
+"**/controller_errors.py" = ["INP001", "N818"]
+"**/test_cli_capture.py" = ["INP001", "E402", "D", "S101", "PLR2004"]
+# This fixture protocol retains the legacy TestCase lifecycle method names.
+"**/test_goal_file_scope.py" = ["INP001", "E402", "D", "S101", "PLR2004", "N802"]
+"**/test_goal_action_receipts.py" = ["INP001", "E402", "D", "S101", "PLR2004", "N802"]
+# Pytest collects the explicitly re-exported run fixture from the companion test module.
+"**/test_goal_atomic_effects.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_resume.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_events.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_event_recovery.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_event_boundaries.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_task_queue.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_task_queue_recovery.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_task_queue_lifecycle.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_task_initialization.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_task_initialization_files.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_task_branches.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_record_purge.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_brain_policy.py" = ["INP001", "E402", "D", "S101", "PLR2004"]
+"**/test_launch_authority.py" = ["INP001", "E402", "D", "S101", "PLR2004"]
+"**/test_installers.py" = ["INP001", "E402", "D", "S101", "S603", "PLR2004"]
+"**/source_manifest.py" = ["INP001", "S603"]
+"**/native_write_sandbox.py" = ["INP001"]
+"**/test_source_manifest.py" = ["INP001", "E402", "D", "S101", "S603"]
+"**/test_goal_resume_authority.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_settlement_receipts.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_resolution.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_resolution_integrity.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_goal_resolution_http.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_panel_extensions.py" = ["INP001", "E402", "D", "S101", "PLR2004"]
+"**/test_decision_scope.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_decision_evidence.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_decision_integrity.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_decision_lock.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/test_decision_consumption.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+"**/review_fixture.py" = ["INP001", "D", "S101"]
+"**/test_cli_goal_authority.py" = ["INP001", "E402", "D", "S101", "PLR2004", "PLC0414"]
+# Retain the existing journal's public exception name in this narrow declaration.
+"typings/brain_requests.pyi" = ["N818"]
+# Preserve the upstream invoke(input=...) keyword in this narrow API declaration.
+"typings/langgraph/graph/state.pyi" = ["A002"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

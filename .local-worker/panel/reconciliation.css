@@ -1,0 +1,27 @@
+.recon-dialog .gov-modal{min-height:0}
+.recon-goal{font-size:var(--desk-section);font-weight:600;overflow-wrap:anywhere;margin:0 0 var(--desk-s2)}
+.recon-tools{display:flex;align-items:center;flex-wrap:wrap;gap:var(--desk-s3);margin:var(--desk-s3) 0}
+.recon-state{padding:var(--desk-s3);background:var(--inset);border-radius:6px;font-size:var(--desk-body);line-height:1.8}
+.recon-state p{margin:var(--desk-s1) 0 0;color:var(--muted)}
+.recon-blocked{font-size:var(--desk-body);line-height:1.8;margin:var(--desk-s3) 0}
+.recon-blocked p{color:var(--muted)}
+.recon-blocked ul{margin:var(--desk-s1) 0}
+.recon-dialog h3{font-size:var(--desk-body);margin:var(--desk-s4) 0 var(--desk-s2)}
+.recon-dialog .recon-tasks{list-style:none;margin:0;padding:0}
+.recon-task{display:flex;gap:var(--desk-s3);align-items:flex-start;justify-content:space-between;padding:var(--desk-s3) 0;border-bottom:1px solid var(--line);font-size:var(--desk-body);line-height:1.8}
+.recon-task>div{min-width:0;flex:1}
+.recon-task strong{font-weight:500;overflow-wrap:anywhere}
+.recon-task p{margin:var(--desk-s1) 0;color:var(--muted)}
+.recon-task .recon-blocker{color:color-mix(in srgb,var(--red) 72%,var(--ink))}
+.recon-task .button{flex-shrink:0}
+.recon-id{display:block;font-family:var(--mono);font-size:var(--desk-caption);color:var(--muted);overflow-wrap:anywhere;user-select:text}
+.recon-identities{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--desk-s2) var(--desk-s3);font-size:var(--desk-caption);line-height:1.8}
+.recon-identities dt{color:var(--muted)}
+.recon-identities dd{margin:0;overflow-wrap:anywhere;user-select:text}
+.recon-files{font-family:var(--mono);font-size:var(--desk-caption);overflow-wrap:anywhere}
+.recon-dialog details{margin:var(--desk-s3) 0}
+.recon-dialog .dialog-footer{justify-content:space-between}
+.recon-dialog .dialog-footer .button{white-space:normal}
+.recon-dialog #recon-status{margin:var(--desk-s3) 0}
+.recon-dialog .gov-checkbox{margin:var(--desk-s4) 0 var(--desk-s2)}
+@media(max-width:600px){.recon-dialog{--desk-body:17px;--desk-caption:15px;--desk-section:18px}.recon-task{flex-wrap:wrap}.recon-task>div{flex-basis:100%}.recon-tools .text-button{min-height:44px;text-align:left}.recon-dialog .dialog-footer{gap:var(--desk-s2);align-items:stretch}.recon-dialog .dialog-footer>.button{flex:1;font-size:var(--desk-body)}.recon-dialog .gov-checkbox{padding:var(--desk-s3);font-size:var(--desk-body);gap:var(--desk-s3)}.recon-dialog .gov-checkbox input{margin-top:var(--desk-s1)}.recon-dialog #recon-reviewed{width:20px;height:20px;min-width:20px}}

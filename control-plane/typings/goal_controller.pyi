@@ -1,0 +1,9 @@
+from goal_actions import Panel
+from pydantic import JsonValue
+
+def run_once(
+    project: str, goal_id: str, panel: Panel, owner_id: str = ...
+) -> dict[str, JsonValue] | None: ...
+def control_goal(
+    project: str, goal_id: str, action: str, payload: dict[str, JsonValue] | None = None
+) -> dict[str, JsonValue]: ...

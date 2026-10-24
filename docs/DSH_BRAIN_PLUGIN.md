@@ -1,0 +1,393 @@
+# DSH 主脑插件：入口决定与实现记录
+
+2026-10-20 新增 **0.2.8 独立启动/新聊天预检修复候选**，尚未部署或原生验收。当前改动、建议取舍与无提醒验证步骤见 [修复说明](DSH_STARTUP_PREFLIGHT.md)。下方历史版本的“不负责启动”“九工具”等描述保留历史含义，不代表新候选行为。
+
+本文保留逐阶段开发历史；早期的“未接入/待验证”和旧文件数量不代表当前版本。当前安装与日常操作见 [DSH 使用指南](DSH_USAGE.md)，版本、配套后台和发布边界见 [发布说明](DSH_RELEASE.md)。0.2.6 加后台修复的原生结果见文末相关验收章节；0.2.7 是尚未安装的新发布候选。
+
+## 项目历史只读与 HTTP 作用域收尾（2026-10-19）
+
+本次后台更新允许新聊天通过正式 status/delivery 工具读取同项目的主脑历史任务，并返回只读权限说明；验收、整改、继续执行、回执仍属于原 owner 和责任会话。无归属旧格式任务不自动收养，跨项目继续拒绝。外部 HTTP 缺少视图头时返回未绑定视图，只有显式 all 才列出全部历史；全局占用数量共享但其他项目活动明细不再混入当前视图。CLI 的原任务等待、续接与阶段操作按已知记录发送明确项目视图。
+
+详情及边界见 [通用接口当前策略](MAIN_BRAIN_CORE.md)。本次没有改插件包，不需要重装 DSH；工作台后台部署需在队列空闲时重启，现有主脑连接随后需要 brain_connect 重新连接。旧安装收据保持原样，今后升级需重新准备与当前源码匹配的计划。
+
+更新日期：2026-10-18。开发分支：`codex/brain-dsh-sidebar`。插件加载与项目/会话绑定基础已由主脑接手修正，并经离线检查及安装版 DSH 临时 ACP overlay 验证。原生桌面 GUI 安装/入口、真实模型规则遵循和自动唤醒仍未实测。
+
+## 用户确认的使用方式
+
+用户希望像当前 Codex 一样，在 DSH 原生软件里正常聊天，打开协作开关后自动使用框架。因此选择**原生插件**作为目标交付形式；专用 ACP 脚本用于开发验证，不作为日常聊天入口。
+
+期望流程：一次安装插件 → 在 DSH 原生聊天选择项目及主脑模型 → 打开协作开关 → 插件绑定当前项目与聊天并加载协作规则 → 主脑按需分派 → 后台等待 → 交付后回到所属聊天独立验收。
+
+不要求用户每次复制项目路径、手动运行派发命令或先说固定口令。项目或聊天身份缺失时应明确显示未绑定，不能猜测安装目录或最近项目。主脑模型由 DSH 原生选择，执行模型与各自的执行 Agent 继续由工作台管理。
+
+## 当前实际验证范围
+
+| 检查 | 结果 | 实际含义 |
+| --- | --- | --- |
+| 已安装 DSH 文件版本 | ProductVersion `0.2.1.0`；FileVersion `0.2.1-rc.2` | 安装文件身份；不等同于模型版本 |
+| ACP initialize | 协议版本 1；Agent 名 `deepseek-harness-acp`，协议组件版本 `0.0.1` | 与桌面产品版本分别记录 |
+| ACP 独立空会话 new/close | 通过 | 仅操作探针自己创建的临时项目会话 |
+| 真实 DSH 挂载通用主脑 MCP | 成功发现九个工具，tools/list 一次，工具调用零次 | 证明安装版本可发现真实 stdio MCP 工具，未连接工作台或派发 |
+| 模型轮次 | 未提交 session/prompt | 此检查没有执行模型推理；不据此保证启动过程没有其他网络请求 |
+| 安装包静态扩展点 | 包含插件管理、串行 agent/created、Agent 作用域、工作区绑定及 MCP 模块 | 存在原生适配基础；静态存在不等于 GUI 安装/加载验收 |
+| 本轮 DSH 原生插件代码 | 离线边界检查及安装版临时 ACP overlay 通过 | 两个临时原生会话分别挂载九工具，项目与会话一致，规则装配生效；未安装到真实 desktop profile |
+| DSH 原生桌面开关、自动绑定、自动唤醒 | 尚未实测 | 不能以离线测试或 ACP 工具发现替代 |
+
+探针只关闭自身会话和进程，未提交模型提示、读取账号密钥、改动真实 DSH 配置或部署运行版。探针脚本、厂商源码摘录及本机结果保留在忽略的本机任务目录，不随源码发布。
+
+## 本轮实现（薄适配）
+
+新增可选插件组合包 `integrations/dsh-brain/`：
+
+- `package.json`：`dsh.bundle.patch = cordis.patch.yml`，预构建 CommonJS 入口 `index.cjs`，不含运行依赖；`@deepseek-ai/dsh-mcp-client` 作为可选 peer，从已安装的 DSH profile 动态解析，不硬编码厂商安装路径。
+- `cordis.patch.yml`：只插入一个 `model-desk-dsh-brain` 条目，`configFile` 默认普通空值，由插件代码读取 `MODEL_DESK_DSH_BRAIN_CONFIG`。原 `!!js` 环境表达式在本机探针中未生效，已修正并重测；未配置时保持 inert。不添加全局项目绑定，不修改模型默认 Agent、preset、预算、次数或 runtime。
+- `index.cjs`：插件主体。每个顶层原生 Agent 使用自己的 `agent.ctx` 挂载一个 stdio MCP client（默认 `serverName=model_desk_brain`），不共用全局 MCP 配置。
+
+新增本机配置生成器 `.local-worker/dsh_brain_plugin.py`：只接受显式绝对路径，只创建用户指定的一个输出文件，已存在时拒绝覆盖；不写 DSH profile、workflow 设置或项目记录。生成内容不含 project/owner/session/role/host，项目与会话只能在运行时从原生聊天取得。
+
+### 原生身份与首次绑定
+
+- 只处理 `ctx.agents.roots()` 中与事件 `agent` **实例相等**的顶层 Agent；不用进程、cwd、服务目录或“最近项目”判断主脑。
+- 可信身份要求 `agent.id === agent.session.id === agent.session.header.id`，且 `agent.session.header.cwd` 是已存在绝对目录的 realpath。任一项缺失、相对、不可解析或不是目录都不绑定，不猜。
+- 首次绑定后，`agent/session.header.cwd`、id 或顶层身份漂移只令绑定失效，不自动改归属。不同原生会话分别绑定、分别使用自己的 owner/operator 摘要。
+- owner 由 `ownerPrefix + SHA-256(native session id)` 稳定派生；`operator_session` 由同一原生 session id 的稳定摘要派生。原生 session id 作为 `--native-session-id` 声明保留。
+- 身份状态如实记为 `user_bound`（用户安装插件并同意自动绑定当前聊天），不是 `host_verified`；不声称宿主已核实。主脑模型/宿主版本只记录实际可声明的来源，本轮启动参数不填模型和版本，避免猜测。
+- 首次绑定记录只保存在当前插件模块的内存中，用于重复 apply/同一模块内热重载/恢复时不改归属；不写入 `.model-desk` 或宿主 profile。DSH 进程重启或插件模块被重新加载后，记录会重新建立；若那时原生 header 已指向其他项目，插件只能按当前原生 header 重新评估，不能阻止宿主层面的会话迁移。
+
+### 工具、开关与作用域
+
+- 每个 Agent 单独 `agent.ctx.plugin(mcpClientModule, config)`；`serverName` 在同一 Agent 作用域内唯一。并发 `agent/created` 以会话 id 去重，`agent/pre-step` 不挂载，插件重载先 dispose 旧实例，避免重复挂载。
+- MCP 启动参数只由原生绑定生成：`--project <realpath>`、`--host dsh`、`--owner <derived>`、`--role brain`、`--session-binding user_bound`、`--session-id <derived>`、`--native-session-id <native>`、`--panel-url <explicit>`。工具参数不能改项目、角色、owner 或会话。
+- MCP client 的 `cwd` 使用该原生项目；`brain_connect` 才显式连接已经运行的工作台。插件不会自动启动工作台，也不会在工具发现阶段访问工作台或调用模型。
+- Agent 作用域工具会被子 scope 继承，因此 `agent.ctx.tools.guard` 做最终单调拒绝：只处理本 server 的 `brain_*` 工具，要求 `exec.agent` **实例等于**所属主脑 Agent；子 Agent、其他会话、缺失 agent、身份漂移或未知宿主 API 都拒绝。不注册全局工具屏蔽，DSH 正常工具不受影响。
+- `brain_dispatch` 与 `brain_rework` 在 guard 内每次重新执行显式配置的 `workflow_settings.py --status`；缺失、不可读、非法、超时或关闭都按 OFF，不使用启动时缓存的允许值。现有 `brain_gateway` 后端仍会在派发/整改效果前再次校验。
+- 开关关闭不取消已有任务、不改绑身份；`brain_status`/`brain_delivery`/`brain_review` 等读取与验收能力保留，仅拒绝新的派发/整改。插件在 pre-step 每轮开始时刷新规则可见性，guard 在每次变更前独立校验。
+- 规则通过 Agent scope 的 `systemPrompt.section` 注册，并按当前 assembly 的 `context.agent` 过滤；子 Agent 看到空规则。规则明确：主脑判断风险与验收、执行端调查实现测试修正、候选/自报非独立证据、`completed` 不等于 `accepted`、最多一次整改、重复/未知保持原 request/task、选择 `model_id` 遵循已保存 Agent、关闭不取消已有任务。
+- 当前未接通自动唤醒/后台续接，规则明确不承诺“完成会自动回来”，也不要求周期性轮询主脑模型；没有伪造无额度消耗等待。
+- `MODEL_DESK_*EXECUTOR*` 环境标记存在时，插件不安装规则/工具；运行期出现该标记时 guard 和 pre-step 也全部拒绝主脑能力。
+- 同时识别现有执行端实际设置的 `MODEL_DESK_RECORD_PROOF`、`MODEL_DESK_PRESET_PROOF`、`MODEL_DESK_SUBAGENT_LEDGER`；不能只检查名字带 EXECUTOR 的假设标记。
+- 直接挂载 MCP 前调用安装版的 `Config` 补齐并校验参数；规则注册失败拒绝新派发。卸载等待 Cordis `inertia`，挂载中途卸载也回收迟到的连接；无法确认关闭时保留失效守卫并禁止重复加载。
+
+## 安装配置（用户显式操作，不由本仓库执行）
+
+1. 先显式启动已运行的模型工作台；插件不会自动启动它。
+2. 把 `integrations/dsh-brain` 作为可选 bundle 安装到 **DSH desktop（主脑）profile**，不要安装到 DSH/Pi 执行器 profile。安装机制以你的 DSH 版本为准；本仓库未修改真实 profile。
+3. 生成显式本机配置（路径占位，必须替换成自己的绝对路径）：
+
+```powershell
+<python> .local-worker\dsh_brain_plugin.py `
+  --python "<venv>\Scripts\python.exe" `
+  --brain-mcp-server "<安装目录>\.local-worker\brain_mcp_server.py" `
+  --workflow-settings "<安装目录>\.local-worker\workflow_settings.py" `
+  --output "<配置目录>\dsh-brain.json"
+```
+
+4. 设置 `MODEL_DESK_DSH_BRAIN_CONFIG` 指向该 JSON 后重启 DSH；或在 desktop profile 的 patch 中按 `model-desk-dsh-brain` id 覆盖 `config.configFile`。两种方式都没有时插件 fail closed（无规则、无工具）。
+5. `--python`、`--brain-mcp-server` 与 `--workflow-settings` 应来自同一个工作台安装；插件 guard 与服务端 `brain_gateway` 必须看到同一套总开关。
+6. 生成器拒绝覆盖已有文件，也不会创建父目录；输出不能位于 `.model-desk`。
+
+## 离线验证命令与结果
+
+```powershell
+node --test .local-worker\tests\test_dsh_brain_plugin.cjs
+node --test .local-worker\tests\test_dsh_brain_sidebar.cjs
+<python> .local-worker\tests\test_dsh_brain_plugin.py
+<python> .local-worker\tests\test_dsh_brain_desktop.py
+```
+
+执行器在模型接口连接重置后中断，原任务保留 failed；主脑接手检查并修正，未自动重派或伪记为执行模型完成。独立结果如下：
+
+- Node 内置测试：18 项通过。除原有边界外，主脑先复现真实执行器标记漏判、规则失败仍能派发、迟到挂载泄漏、未等待 Cordis 清理的四项问题，再修正；补验关闭失败保留守卫和 Windows 当前盘根路径拒绝。
+- Python 配置生成器：12 项中 11 项通过，目录软链接检查因本机无创建权限跳过 1 项；实际及链接目标均校验 `.model-desk` 路径。不能将该跳过项写为已实测通过。
+- 通用主脑核心 56 项、现有 Codex MCP 37 项、可移植安装 19 项全部通过。本轮未改现有核心，合计定向检查 142 项，141 通过、1 跳过；不是全项目回归。
+- 上述回归只用 mock、临时项目及临时状态脚本，不启动真实 DSH/工作台、不调用模型。
+- 独立真实接口探针：安装版 DSH + 临时 ACP overlay 加载实际插件和真实 MCP 服务。两个临时项目/原生会话各有九工具，`brain_describe` 的项目/会话匹配，owner 和责任绑定不同，规则装配生效；借原生作用域链模拟继承者调用验收被拒绝。临时开关关闭拒绝派发，读取/验收仍可用。仅调用 `initialize`、两次 `session/new`、两次 `session/close` 和每会话一次本地 `brain_describe`；没有 `session/prompt`、`brain_connect`、派发或验收效果调用，也未修改真实宿主配置。作用域继承探针不是实际子 Agent 模型轮次。
+
+本轮未重复全项目 `unittest discover`：只新增可选适配器和生成器，未修改既有 Python 核心；按改动运行上述独立定向检查。通用核心上轮全量回归的两项既有 DSH 环境缺件仍不能称为全绿。
+
+## 仍未验证 / 明确边界
+
+- 原生 GUI 插件管理和实际桌面聊天仍需验证。包的官方 CLI 安装/卸载与环境配置读取已有独立探针，不能将这些结果写成 GUI 验收通过。
+- 临时 ACP overlay 已验证实际 `agent/created`、`session.header.cwd/id`、`ctx.agents.roots()`、MCP 解析、`tools.guard` 和 `systemPrompt.section`。尚未验证真实桌面聊天中的 pre-step 顺序、动态开关后的下一轮模型行为和 GUI 状态；ACP 接口探针不替代桌面验收。
+- 未验证真实模型轮次中规则是否实际影响行为，也未验证关闭开关后规则在真实 GUI 中的可见状态。
+- 未实现自动唤醒、后台续接、桌面通知、完成投递一次或等待恢复；插件未承诺这些能力。
+- 当前 `0.2.1-rc.2` 的 MCP 解析与导出经探针验证，其他版本和正式 link/bundle 安装路径未验证；插件会从 DSH 上下文 baseUrl、插件包位置和运行目录动态尝试 require/import 并 fail closed。若解析不到可显式配置 `--mcp-client-path`，不保证任意版本兼容。
+- bundle patch 不再依赖 `!!js` 读取环境；本机失败探针保留，改用插件内的显式环境指针读取后，安装版双会话探针通过。配置完整内联路径时不会混入继承的其他安装配置。
+- 开关 guard 在每次派发/整改前同步执行一次 `workflow_settings.py --status`，可能给该工具调用增加一个本机 Python 启动延迟；超时/失败按关闭处理，不缓存允许状态。
+- 插件只应在 desktop 主脑 profile 使用；代码中的顶层判断不能替代用户正确的 profile 安装范围。未知/缺失宿主 API 时只保持无规则/无工具，不会全局屏蔽 DSH 正常工具。
+- 首次绑定仅在本插件模块生命周期内固定；DSH 进程重启或模块重新加载后的原生会话迁移属于宿主行为，插件不写持久归属记录来阻止。
+- 本机控制器授权仍是应用层信任边界，不声称 OS 隔离或抵抗恶意同用户进程。
+- 未改 `brain_context.py`、`brain_gateway.py`、`brain_requests.py`、`brain_transport.py`、`brain_mcp_server.py`、现有 Codex 面板、每模型 Agent 默认值、付费许可或工作台预算/次数。
+- 现有 `.local-worker/panel/app.js` 已从 `window.location.search` 读取 `project` 并进入显式项目视图；本轮未改面板 HTML/JS。面板令牌由页面自己的 `/api/session` 获取，不进入入口 URL。
+- 客户端只能读取浏览器侧原生会话行的 `cwd`，不能像 Host 那样做 `realpath`；若该路径是符号链接、8.3 短名或大小写别名，工作台可能把它当成不同的项目字符串。Host MCP 仍使用自己的 realpath 绑定，二者都不猜路径。
+- 右侧栏入口的实际 GUI 可见性、点击后原生 browser tab 的呈现与真实项目切换仍需用户在已安装 DSH 中确认；本工作只完成源码、mock/临时状态测试和安装版 ASAR 只读接口核对，未实际安装 0.2.0、未重启 DSH、未看到 UI。
+- 客户端面板 origin 在安装器 `prepare` 时写入准备包；手工安装源码包只使用 `http://127.0.0.1:8765`。若工作台实际监听其它端口，必须用安装器的 `--panel-url` 重新准备，不能由客户端猜端口。
+- 原生 browser tab 支持 `multiple`，因此每次点击“模型工作台”都会新增一个原生浏览器 tab；这是 browser 包的既有行为，当前不做跨 tab 去重或静默复用。关闭最后一个 tab 的行为仍由原生 sidebar 规则决定。
+- 若目标 profile 未启用 `@deepseek-ai/dsh-client-ui-sidebar-browser`，临时正文会显示“无法打开原生右侧栏浏览器”的可解释错误；不会退回自建 iframe、私有 DOM 或外部浏览器。
+
+## 交付前必须验证（仍待真实宿主）
+
+- 两个项目/聊天不会互读、错派或串用请求回执；身份不清时不能变更任务。
+- 原生主脑聊天具备工具；执行器与子 Agent 不具备同一主脑权限。
+- 原生右侧栏出现中文“模型工作台”，一次点击在当前会话所属项目打开工作台；两个会话/项目切换不串；未知会话只显示未选择提示；浏览器未启用时显示可解释错误；插件停用后入口消失且旧浏览器 tab 仍可解释。
+- 开关关闭不触发新自动工作；开启时规则实际生效，不仅是界面开关变色。
+- 正确交付可接受，故意缺陷会被拒绝；执行模型 completed 不直接变成验收通过。
+- 后台等待不触发周期性主脑模型轮次，完成后能正确续接原聊天；失败/未知不重复派发。
+- 保留现有 Codex 流程、项目内记录、每模型 Agent 默认值、付费许可和用户关闭的可选限制。
+- 安装、更新、卸载不覆盖其他插件或账号配置；GUI 可见性由真实桌面使用验证。
+
+## 官方依据
+
+- [DSH 第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)：Cordis 插件与作用域资源清理。
+- [插件打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)：组合包、profile、配置层及安装机制。
+- [扩展插件实操手册](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/extension-cookbook.zh.md)：原生事件、工具注册、提示词扩展与 followup。
+- [右侧 Sidebar](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/sidebar-right.md)：tab 类型注册、guide 扩展、`ctx.sidebarRight` 与会话生命周期。
+- [Sidebar Browser](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-sidebar-browser/README.md)：原生浏览器 tab、loopback 页面与 `ctx.sidebarRight.openTab('browser', { params: { url } })`。
+- [ACP 文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/acp/acp/README.zh.md)：自动化入口，与原生 GUI 接入分开验收。
+
+官方主分支文档用于选择路线，安装版本的能力以本机验证为准。本阶段基础代码与接口边界已独立检查；下一步是原生桌面安装/入口及实际需求的协作与质量闭环，再验证后台唤醒。
+
+## 原生右侧栏“模型工作台”入口（0.2.0，桌面可见性待确认）
+
+目标是把已运行的本机工作台放进 DSH 原生右侧栏，而不是在外部浏览器手填 URL。入口优先复用安装版自带的 `@deepseek-ai/dsh-client-ui-sidebar-browser`，不修改 DSH 安装目录、不向父页面注入私有 DOM，也不接管浏览器正文。
+
+### 本机版本依据（0.2.1-rc.2）
+
+- `integrations/dsh-brain/package.json` 的 `dsh.client` 与 `exports["./client"]` 由安装版 `@deepseek-ai/dsh-client-modules` 扫描；browser half 是 `client.mjs`，Host half 仍是 `index.cjs`。只读查看 `app.asar` 确认：`dsh-client-ui-sidebar-browser@0.2.1-rc.2` 声明 `dsh.client.platform: "web"`；`dsh-client-ui-sidebar-right@0.2.1-rc.2` 公开 `ctx.sidebarRightTabs.register()`、`ctx.sidebarRight.openTab()`、`sidebar.right.pane.tab` keyed seat，以及 `sidebar.right.pane.tab` 的 session scope/inject 形状。
+- 浏览器 tab 在 Desktop 使用 Electron `<webview>`，支持 loopback HTTP(S)；引用包 README 明确允许 Client 插件调用 `ctx.sidebarRight.openTab('browser', { params: { url } })`。因此入口只负责“按当前原生会话拼 URL”，页面沙箱、历史、保活与关闭仍由原生 browser tab 负责。
+
+### 实现与身份边界
+
+- `client.mjs` 通过 `ctx.sidebarRightTabs.register()` 注册一个页面类型和 guide 条目，标题固定为中文“模型工作台”。点击后由该类型的临时正文调用 `tab.actions.openTab('browser', { params: { url }, replaceTab: true })`，把临时页替换成原生浏览器 tab；一次点击即可看到工作台。
+- 临时正文的 `inject` 从当前 slot 取得 `sessionId`，只读取 `ctx.sessions.list` 中该原生会话行的 `cwd`。`cwd` 必须是绝对本机路径（Windows 盘符/UNC 或 POSIX 根）；空值、相对路径、控制字符或会话列表尚未加载时都不猜服务 cwd、不读最近项目、不改用屏上其他会话。未知身份显示可解释的“未选择项目”，并只提供显式“打开未选择项目的工作台”按钮；目标 URL 显式携带 `view=unbound`，避免读取页面记住的项目。Windows 桌面同时拒绝 `/work` 这类依赖当前盘符的目录；POSIX 客户端保留其根路径形式。
+- 已知 `cwd` 用 `URLSearchParams.set('project', cwd)` 写入 loopback 工作台 origin，路径只出现在浏览器 URL 的 `project` 参数中；不附加 panel token、连接 capability、owner/session 凭据或父页面 postMessage。客户端没有 `fetch`、`/api`、`localStorage`、`postMessage` 或模型调用。
+- 两个会话各自渲染自己的 guide/tab，正文只使用所属 tab 的 `sessionId` 与 `tab.actions`，切换会话不会借用屏上会话的项目；没有当前会话时不构造 project。隐藏/重新打开由原生 browser tab 的既有生命周期处理；插件停用/卸载时 Cordis effect 释放 guide 与正文注册，已打开的浏览器 tab 仍归原生 sidebar 管理。重复点击会按原生 browser 的行为新建浏览器 tab，不会把项目参数混到别的会话。
+- 打开面板只加载工作台页面；本入口不调用模型、不派发任务、不写任务记录，也不要求空项目初始化 Git 或 records。工作台自身页面加载后的行为仍受其现有开关、预算与记录规则约束。
+
+### 安装器与版本
+
+- `dsh_brain_desktop.py` 的固定清单新增 `client.mjs`（六个文件）；`package.json` 版本升到 `0.2.0`，并补上 `exports["./client"]`、`dsh.client` 与 `files`。`prepare` 会把同一个 `panelUrl` 以带引号标记替换进准备包内的 `client.mjs`；源码包本身保留 `http://127.0.0.1:8765` 回环默认。清单、标记数量、归属收据与未知结果语义不变。
+- 手工直接安装源码 bundle（不经过 `prepare`）时客户端使用默认 `http://127.0.0.1:8765`；自定义 `--panel-url` 必须走安装器的准备包。准备后再改 `panelUrl` 会让 Host MCP 与客户端入口不一致，必须重新 `prepare`（并完成对应的归属/卸载流程），不能只改 live `config.json`。安装器仍不覆盖已有归属收据，也不会自动更新 live preparation。
+- 从已安装的 `0.1.0` 升级：先用原安装资料目录执行 `uninstall`，确认插件移除后再对新目录 `prepare`/`install` 0.2.0；不要覆盖或重写旧 `plan.json`/`receipt.json`。0.1.0 的旧收据仍可卸载其五个 Host 文件；新 `client.mjs` 只属于 0.2.0 准备包。
+
+本轮离线结果：`test_dsh_brain_sidebar.cjs` 10 项通过；`test_dsh_brain_desktop.py` 36 项通过（含准备包 origin/标记两项）；`test_dsh_brain_plugin.py` 运行 12 项，其中 11 项通过、1 项目录软链接检查因权限跳过；`test_dsh_brain_plugin.cjs` 19 项通过。当前 worker 进程带有 `MODEL_DESK_RECORD_PROOF`/`PRESET_PROOF` 执行器标记，宿主测试需仅在子进程中清除这三个 `MODEL_DESK_*` 标记（`RECORD_PROOF`/`PRESET_PROOF`/`SUBAGENT_LEDGER`）后运行；这不是产品失败，插件按设计在该标记下禁用。静态只读 app.asar 探针确认三个 0.2.1-rc.2 包版本、guide/tab 公开点、browser loopback 接口和本地 client 清单均为 true。以上均未启动真实 DSH GUI/工作台或调用模型。
+
+## 桌面安装入口（2026-10-18）
+
+新增 `.local-worker/dsh_brain_desktop.py`。默认无安装副作用，操作明确分开：
+
+```powershell
+<python> .local-worker\dsh_brain_desktop.py prepare `
+  --output "<尚不存在的本机安装资料目录>" `
+  --workbench "<已部署新主脑接口的工作台目录>" `
+  --python "<工作台 venv>\Scripts\python.exe" `
+  --executable "<DSH目录>\DeepSeek Harness.exe" `
+  --home "<已由 DSH 初始化的 DSH_HOME>"
+<python> .local-worker\dsh_brain_desktop.py check --directory "<安装资料目录>"
+<python> .local-worker\dsh_brain_desktop.py install --directory "<安装资料目录>"
+<python> .local-worker\dsh_brain_desktop.py uninstall --directory "<原安装资料目录>"
+```
+
+- `prepare` 只创建新目录中的 `plugin.tgz`、`config.json` 和最后提交的 `plan.json`。0.2.0 包含六个明确源码/许可文件（新增 `client.mjs`），不含机器配置、模型密钥或记录；拒绝链接源码、已有输出与 `.model-desk` 路径。目录不完整时无法安装。
+- `check/install` 使用 unknown 责任绑定连接已运行的新 broker，只读取 describe，不具备任务变更授权。旧版接口/连接失败/返回身份不匹配都拒绝安装；不会为安装启动或部署工作台。
+- `install` 只对显式 DSH_HOME 的现有 desktop profile 调用已安装产品携带的官方 CLI，默认离线，禁用安装脚本和自动 peer 安装。只设置 `MODEL_DESK_DSH_BRAIN_CONFIG` 这一条 User 环境值，不改 PATH、账号或 profile patch。已有同名未知插件/环境值不能接管。
+- 使用固定清单/hash、独占操作锁与原安装收据确认归属。重复成功安装不重复执行 CLI；命令结果未知时标 attention，不自动安装/卸载；不会把安装前快照覆盖回用户后来修改的 profile。
+- 首次未知失败可显式执行 `reconcile-absent --directory <原安装资料目录>`：核查 DSH 及其安装进程已退出、无原生运行标记/锁、无本插件引用/链接/环境值、原 manifest 其他元数据不变。它只确认插件未安装，不承诺包缓存没有变化，不执行安装。保留原失败记录后，才允许单独的 `install --retry-verified`，至多一次。
+- 官方 CLI 明确返回 `ERR_PNPM_NO_OFFLINE_META` / `ERR_PNPM_NO_OFFLINE_TARBALL` 时，可显式执行一次 `install --resolve-offline-cache --directory <原安装资料目录>`。它再次核查上述归属/未安装状态，通过同一官方入口联网解析依赖；继续禁用安装脚本、自动 peer 安装并保留原生兼容检查。未知错误、认证错误、已安装/元数据漂移或已有联网修复失败均不适用，不自动降级/联网/循环重试。所有先前失败收据保留。
+- `uninstall` 比较原包路径与原收据，只移除本插件并清除仍属于本安装的环境值；保留其他插件与准备目录中的资料。环境值或插件来源被用户更改时拒绝覆盖。已删除/升级工作台仍可按原收据移除自己的包；宿主版本变化需先核查。
+- 安装/卸载均不关闭或重启任何程序。已运行 DSH 不会自动获得新 bundle 成员和环境，需要用户择时退出再打开。安装包资料目录必须保留，不能作为普通临时文件清理。
+- 本轮执行任务在启动前因 DeepSeek 余额查询 DNS 失败终止，模型调用 0；安装实现由主脑完成，没有绕过余额门禁或替换执行模型。
+
+独立验证：安装器 24 项离线测试、插件 19 项 Node 测试通过；安装版 DSH 在临时 DSH_HOME 中使用官方 CLI 的完整 add/remove 探针通过，其他元数据不变。原先 remove 不支持直接传入的选项已改用其支持的 `--config.*` 形式，失败探针保留。原 bundle 配置表达式失败后改用代码读取环境，真实 DSH 双项目加载探针再次通过，无模型提示或 broker 变更。新接口叠加运行版其他源码的临时兼容镜像，56 项核心测试通过。安装预检另补真实 transport 协议形状测试，避免 mock 掩盖声明格式错误；两个不同安装资料目录也受同一个 profile 操作锁约束。真实 GUI 与主脑质量闭环不能由这些探针推定。
+
+本机接入状态：队列确认空闲后，已备份并部署经过兼容验证的接口源码，工作台重新就绪。正式安装资料位于运行目录的 `.local-worker/desktop-integrations/`（已加入 Git 忽略规则，不能清理或公开上传）。首次官方 CLI 安装失败且原因未记录；用户完全退出 DSH 后核查没有已安装插件/原生运行标记，明确重试取得 `ERR_PNPM_NO_OFFLINE_META`，定位为缺少离线缓存。随后使用同一官方入口的一次显式联网缓存修复安装成功，两个先前失败记录均保留。0.1.0 实际安装的五个 Host 文件与准备包逐项 hash 一致，插件引用及环境指针匹配；其他 manifest 元数据、模型范围、付费许可和可选限制均未改变。真实只读主脑预检通过。本次诊断/安装未调用模型，没有自动重启 DSH。用户再次完全退出 DSH 后，已按原安装收据卸载 0.1.0，并在全新安装资料目录准备/安装 0.2.0。官方 CLI 成功返回，六个实际安装文件逐项 hash 与准备包一致，新配置指针正确，原生其他 manifest 元数据及工作流开关/范围/预算保持不变；无需重启工作台服务，未自动重启 DSH。右侧栏实际可见性仍待用户重新打开后确认。
+
+独立恢复测试现为 34 项通过，覆盖原失败保留、原生标记/运行进程/配置变化拒绝、明确恢复、固定离线错误联网修复以及失败不重复。原生 GUI 仍需用户重新打开 DSH 后确认；真实协作质量与自动唤醒尚未验收，不由安装成功推定。
+
+### 主脑独立检查（0.2.0 源码候选）
+
+主脑检查了实际改动与安装版 SDK 的 session-list、slot 注入、tab actions 和 Client 模块导出形状，并独立执行：Python 48 项（47 通过、1 项目录软链接权限跳过），Node 30 项全部通过。补上未知项目的显式 `view=unbound` 和 Windows 当前盘符根路径拒绝检查；没有更改 Host/MCP 代码、主脑控制器、模型范围、默认 Agent 或用户预算设置。静态 API 依据不能证明实际 GUI 入口可见。
+
+源码候选和六文件发布包已就绪，当前 live profile 已按用户授权升级到 0.2.0；旧安装资料与收据保留，旧收据状态为 uninstalled，新收据为 installed。升级检查确认六文件 hash、配置归属及原生其他插件元数据一致。下一步由用户重新打开 DSH，确认右侧入口及双项目切换；GUI 与自动唤醒仍未标为验收通过。
+
+## 0.2.1 主脑账户余额与付费候选（源码已检查，尚未部署）
+
+用户已通过桌面截图确认 0.2.0 原生右侧入口实际可见，且项目为该聊天的 `header.cwd`。本轮改为在 DSH 入口携带展示参数 `host=dsh`；它只决定界面展示，不是身份、角色或授权。顶部显示 **DSH 登录账户余额**，不使用工作台模型 API Key 的余额替代；Codex 入口保留原 GPT/Codex 额度。已有旧浏览器 tab 的 URL 没有该参数，需要关闭旧 tab 并从新版“模型工作台”入口重新打开。
+
+### 原生账户通道
+
+安装版 `@deepseek-ai/dsh-api-account-controller@0.2.1-rc.2` 提供 `accountController.getState/getBalance/watch/watchExpiry`；本轮只读核对了官方产品包的服务和元数据形状，不读取用户认证文件/缓存或提取凭证。新增 `account.cjs` 只投影普通/赠送钱包的 CNY/USD 金额与状态。账户变化先清除旧值、拒绝迟到结果；注销/凭据失效/停用均不保留旧金额为当前余额。服务延迟加载会重新查询服务注册表。
+
+适配器经直接 Node HTTP 回环请求，将公开快照提交给现有工作台 `/api/host-account/snapshot`；仍需现有 panel session token，保留原有 origin/CSRF/回环检查，不走模型工具。临时 token 仅在适配器内存中，不进入 URL、页面、日志或模型上下文。传输不使用全局代理、不跟随重定向。原始 SDK/网络异常不向日志或页面转发。缓存只在服务内存中，余额约每两分钟同步；“更新显示”读取最近快照，不冒称立即请求 Platform。旧值标记过期，过久则隐藏金额；不改账本、预算、付费许可或任务运行时间。
+
+### 候选与默认模型
+
+主脑只读实测：`paid_only` 下 DeepSeek（模型保存的 DSH 执行 Agent）在候选中，显式 `brain_route_preview` 通过；因此没有“主脑是 DeepSeek 就禁止 DeepSeek 执行模型”的规则。不能复现用户历史提示的完整调用，历史触发原因保持未知。确定存在的配置冲突是手动默认仍为本地 Qwen，与 `paid_only` 不符：省略 `model_id` 时不会静默换模型。
+
+现在 `brain_candidates` 明确返回默认模型是否在范围内、可选候选 ID 与独立付费授权状态；默认范围冲突会提示可选择的模型，不能说成整个范围无模型。主脑规则要求依真实候选显式选型，并说明普通独立执行会话与执行器嵌套子代理不同，后者的 deny 不会排除普通候选。界面同时标记手动默认在当前范围外。原模型/Agent 默认值、稳定 request_id 与归属/重放规则保持。
+
+### 验证与发布边界
+
+工作任务 `20261018-231549-9919aa` 在部分实现后因模型接口故障退出（156 次调用），主脑接管修正并独立检查，保留原失败与整改计数。定向 Python 检查累计 158 项（157 通过、1 项目录软链接权限跳过）；Node 49 项通过。运行版其他 Python 源码的临时兼容镜像另有核心/HTTP 58 项与余额 7 项通过。检查包含无权限写入拒绝、宿主区别、账户切换/注销/过期、晚到响应、错误脱敏、回环重定向拒绝、打包/接口缺件、默认范围冲突和 Codex 额度展示；全程无真实模型回归或真实账户余额查询。
+
+0.2.1 的固定包清单为七文件（新增 `account.cjs`）。安装前同时验证主脑接口与 `/api/host-account`；旧后台不支持时拒绝安装。2026-10-19 交接已确认运行版升级完成、七文件 hash 相符、旧 0.2.0 收据 uninstalled、新 0.2.1 收据 installed；不要重复安装。桌面账户适配器未发布真实快照，之前 HTTP/假 controller 诊断值均不能作为真实余额证据。DSH 自动唤醒仍未实现。
+
+## 0.2.2 账户启动修正候选（2026-10-19）
+
+代码确认 0.2.1 先等待已有聊天的 MCP 绑定，之后才启动账户适配器；另外只检查插件 ctx，缺服务时静默重试。这些是可复现的实现缺口，尚未证明哪一个触发了真实桌面故障。
+
+0.2.2 提前独立启动账户适配器，按插件 ctx → ctx.root → 当前顶层 Agent ctx 解析官方 `accountController`。服务缺失时发布不含金额的等待状态，以清除旧诊断，再重查服务；解析路径、公开登录状态和首次发布确认使用固定脱敏日志。账户同步不等待 MCP，也不放宽主脑身份、范围、付费授权和账户 HTTP 防护。
+
+离线测试包含：已有 MCP 永久等待时，真实适配器仍可向隔离的临时 HTTP 服务发布 updating → ready；三个注册表的优先级、缺失服务后来出现、重入去重、初始化期间退出、注销/账户切换/过期、错误脱敏、打包七文件与 Codex 额度展示。测试只使用假账户，不向现有工作台写诊断余额。实际安装和原生账户结果仍待完全退出 DSH 后升级、重新打开验证。
+
+候选独立检查：Node 56 项通过；Python 57 项，56 通过、1 项目录软链接权限跳过。源码位于 `codex/dsh-account-startup`。
+
+### 0.2.2 本机安装核验（2026-10-19）
+
+用户完全退出 DSH 后，已按 0.2.1 原收据卸载、在新的 0.2.2 资料目录安装；实际七文件 hash 与候选发布清单相符，旧收据 uninstalled、新收据 installed。工作台后台按进程身份核对后重启，旧测试缓存已清除。其他插件 manifest 摘要、工作流开关/范围/预算、用户已有文件保持一致。部署后另有 Node 56 项与 Python 余额缓存 8 项通过，测试仅使用 mock/临时 HTTP 服务，没有向真实面板写测试余额。
+
+DSH 由用户自行重新打开；真实账户快照、余额展示和原生会话切换仍待验证。安装核验不表示真实账户已接通，也不表示新增了自动唤醒能力。发布候选源码为 `b1cf9c4`，安装过程和 hash 清单保存在本机忽略的任务证据目录，未公开上传。
+
+## 0.2.3：真实 Cordis 上下文创建失败（2026-10-19）
+
+用户重新打开 0.2.2 后，主脑 MCP 已由新的 Host 启动，但账户接口仍无 received_at。检查产品自带的 Cordis 4.0.5，确认插件上下文读取未声明属性会抛错；账户适配器创建时未保护的 `ctx.version` / `ctx.app` 读取发生在发布器建立之前。这是已用真实产品框架离线复现的故障，并非账户未登录或余额为零。
+
+修正对可选版本提示的读取，缺失提示保持兼容版本回退；不改账户接口、认证、服务解析、主脑绑定或传输防护。新增严格代理回归，Node 57 项通过；安装相关 Python 49 项（48 通过、1 项权限跳过）。产品真实 Cordis 临时上下文对照：0.2.2 创建抛错；0.2.3 创建成功，假 controller + 内存 publisher 发布 updating → ready。探针不加载用户 profile，不读认证/会话、不连接真实账户、不向工作台写诊断。新候选仍须退出 DSH 后升级，安装前不宣称真实余额已接通。
+
+### 0.2.3 本机安装核验
+
+用户退出 DSH 后，已按原 0.2.2 收据升级至 0.2.3（候选源码 `7c4f054`）。实际七文件 hash 与发布清单一致，原收据 uninstalled、新收据 installed；其他插件、工作流设置和用户文件的摘要保持一致。此版本未修改后台代码，复用现有面板进程。部署后 Node 57 项通过，并用已安装 account.cjs 在产品真实 Cordis 临时上下文中复核创建和假账户发布成功。
+
+测试未连接真实账户，也未向现有面板写入模拟余额。原生真实账户快照/余额仍待用户自行重开 DSH 后验证，不把离线 ready 视为真实余额已接通。
+
+### 0.2.3 原生账户链路验证
+
+2026-10-19 用户自行重新打开 DSH 和右侧工作台后，后台收到来自 DSH 官方 `account.getBalance` 的新鲜 ready 快照，无错误，包含普通和赠送两个 CNY 钱包。接收时间晚于本次 DSH 启动，现有面板没有被写入本轮模拟快照，确认真实账户同步已接通。证据摘要仅保存在本机任务目录，不将金额、账号身份或认证信息提交进源码。
+
+这项验证确认原生账户到工作台后台的同步链路；原生页面金额的人工逐项比对、跨会话切换及自动唤醒未由此得到验收。
+
+## 0.2.4 主脑工具明细的模型可见性
+
+DSH 真实小任务闭环报告及 Codex 独立复核确认：模型默认 DSH Agent 覆盖全局 Pi 默认的路由成立，小任务实现和验收通过；正式 candidates/status/delivery 等读取仅显示摘要，完整闭环实际借助只读补证，不能当作所有正式工具均已验收。报告中的业务文件消失已由用户确认是本人删除，排除执行器误删异常。
+
+检查安装版 MCP 客户端并离线复现：createExecutor 保留 structuredContent，createOutput.render 只投影 content；本项目此前把明细仅放 structuredContent，两者组合使模型看不到明细。修正本项目 brain_mcp_server 的返回格式，九个正式工具和本服务错误结果均包含说明 + 完整精简 JSON 文本，同时保留原结构化字段，不改已有 SDK 参数校验错误。只镜像正式主脑网关已有公开结果，不增加原始全局状态、认证或任意 HTTP/文件权限。
+
+检查包括：全部九工具的真实 MCP stdio + 临时 HTTP mock 闭环、状态读取/重复派发/整改/验收幂等、未知结果请求引用、文本与结构化字段完全一致、交付长度标记保留、私有能力不外泄。设置显式 MODEL_DESK_TEST_DSH_EXE 时，同一批真实协议返回再交安装版 createMcpToolDefinition 执行与渲染，核对成功结果明细及错误诊断在模型文本中可见。探针不加载用户 profile，不连接真实模型。
+
+候选 Python 118 项（117 通过、1 项权限跳过）、Node 57 项通过。对应客户端包版本为 0.2.4，需要同步配套 MCP 源码并刷新安装计划的指纹；不得改写旧安装收据来跳过指纹校验。当前原生 DSH 仍运行 0.2.3，实际正式工具可见性仍待升级、用户重开后确认。
+
+### 0.2.4 本机安装核验
+
+用户退出 DSH 后，已按原 0.2.3 收据升级至 0.2.4，候选源码 `e502960`。实际七文件和运行目录 brain_mcp_server.py 的 SHA-256 与发布清单一致，旧收据 uninstalled、新收据 installed；其他插件元数据、用户已有文件、工作流设置保持不变。旧 DSH 主脑 MCP 进程已全部退出，此次未重启面板或自行重启 DSH。
+
+部署后将协议测试的 SERVER 显式指向实际运行目录源码，MCP stdio/临时 HTTP mock 检查 7 项通过，覆盖安装版 DSH 客户端文本投影。真实模型没有参与测试。原生 DSH 聊天需重新打开后只读验证正式工具的可见字段，不重新派发先前 smoke 任务，不通过 HTTP/本地任务记录替代这项可见性验证。
+
+### 0.2.4 原生正式工具复测
+
+用户转回原 DSH 聊天的只读结果确认 connect/describe/candidates/status/delivery 直接返回摘要及完整 JSON，模型可读身份、范围/候选、历史任务状态和交付明细，无错误或归属拒绝；该轮没有派发或通过 HTTP/本地记录补证。结合已部署源码与安装版投影测试，正式读取工具明细不可见问题验收通过。
+
+升级前保存的设置与复测时设置均为 local_only，升级未改变模型范围；付费候选当前不可新派发，历史任务仍可在原归属下只读访问。此结论不扩展为跨项目、Pi/本地执行、整改/恢复或自动唤醒已验收。
+
+### home + Pi 真实执行及一次整改
+
+后续 DSH 原生测试中，home + Pi 首轮完成后，主脑独立检查发现超长 ASCII 前导零被直接 int() 的默认数字位数限制误拒；正式退回 c2，保持同模型/Agent、项目和拥有者，使用新 Pi 会话整改一次，最终 completed/accepted。Codex 独立核对父子任务、交付 hash 和整改记录，复跑 unittest 6 项、8 合法/54 非法边界均通过，另枚举 196605 个合法输入及 5 项超长边界通过。此结论覆盖本例执行和真实整改，不代表复杂任务、跨项目或系统失败恢复通过。
+
+另从本轮 Pi 日志及纯策略判定确认共享记录保护的误拦截：Format-List 被破坏性动词 format 正则命中；显式缓存子目录清理与后续目录列表的复合命令被当作根目录隐式破坏操作。模型还在拒绝后换工具重试同一删除动作，这项行为需纠正，不因误拦截而允许绕过。未发现工作台记录被修改的证据；目录提示和工具参数 guard 仍不等于 OS 沙箱。后续应单独修复误判并保留保护范围，不能将保护相关项概括为全部通过。
+
+## 0.2.5 共用等待宿主层与唤醒诊断候选
+
+将原 Codex 完成监听的宿主调用提取为 `completion_host.py`，保留原 Codex 通道和通知批次编号；DSH 通过仅绑定当前顶层原生 Agent 的 Windows 管道连接 `followup`。任务监听、终态判断、批次归属和投递前持久 claim 仍由共用核心负责。DSH 订阅额外要求原 owner 与责任绑定一致；同项目历史只读不授予通知权限。未知宿主不回退、消息内容只接受固定引用，不开放任意提示或目标聊天。
+
+本阶段只开放显式诊断工具 `brain_wakeup_probe`。它在确认监听后等待约 30 秒和原聊天空闲，再尝试一次固定事件；收到后模型通过 received 登记。重复 start 不新建第二个探针，结果未知不重试，关闭聊天/插件会清理监听。stop 可取消未投递诊断，状态仅保存在当前进程，不承诺重启恢复。加载和等待不调用模型；事件唤醒会启动主脑一轮并产生用量。真实任务的 DSH 自动订阅、接收登记及验收衔接尚未开放；探针通过后再接入。
+
+离线证据分为三层：绑定/权限/停止/去重的单元测试；实际 Windows 管道与独立 Python 后台等待进程；安装版 DSH 的真实 Agent 循环搭配临时 ACP profile 和本机脚本化假提供方。最后一层确认原回合变为空闲后，followup 触发第二轮且没有第三轮；没有加载用户 profile、读取认证或调用真实模型。它不能代替原生桌面聊天中的显示和模型 received 确认。
+
+发布清单新增 wakeup.cjs，共八文件；安装计划同时核对新增 Python 宿主模块。升级需退出 DSH，按原 0.2.4 收据处理，不覆盖旧收据，不自动关闭/重启 DSH。当前是已测试源码候选，实际安装与原生聊天探针另记；原账户同步、右侧入口和执行器选择不改。
+
+### 0.2.5 本机安装核验
+
+2026-10-19 用户要求继续升级并退出 DSH 后，按原 0.2.4 收据卸载、在新目录安装 0.2.5（候选 bf44475）。八文件与新包 SHA-256 相符，配套运行源码指纹通过；原收据 uninstalled、新收据 installed。其他插件元数据、工作流及模型设置摘要保持一致，未自动重启 DSH 或面板。运行版原先尚缺的 Windows 扩展路径前缀兼容修复随已验证的等待核心同步，原文件有备份。
+
+协作开关保持用户关闭状态；诊断开始前需要由用户手动开启。原生聊天探针、模型 received 确认仍未验收，真实任务自动唤醒尚未开放。安装核验不能代替桌面实际运行结果。
+
+### 0.2.5 原生探针用户确认
+
+升级后用户重开 DSH 并在原聊天按探针文案操作，确认“自动回来了”。这是原生 GUI 自动回复的人工证据。Codex 未读取用户会话或认证文件，也未独立核对 received 字段；该字段保持未独立验证。探针通过不等同于真实执行任务完成后通知、验收及整改都已验证。
+
+## 0.2.6 正式任务完成通知候选
+
+新增仅绑定 DSH 主脑 MCP 可见的 brain_wait（start/status/received/stop），沿用完成核心和原生 followup 通道。派发后快速登记整个批次，仅等待确认后结束主脑轮次；后台读真实任务终态，整批结束后一次通知。通知固定携带项目、原任务和 wait_id，不转发执行器提示或答案为命令。收到后登记并独立验收；登记不生成验收通过记录。新整改任务单独登记，原任务不重派。
+
+start 同时校验协作开关、有效 broker 连接、原始拥有者/责任绑定和原生项目/聊天。项目历史只读无法订阅；一条 MCP 连接不接受多个不同活动批次。状态仅投影必要字段，不暴露进程 ID、源码指纹或私有通道。监听存活及心跳未确认时 waiting=false；重复 start 不启动第二个监听，未知结果不自动恢复、重试或派发。关闭开关仍可读状态、登记接收和停止通知，停止不会取消执行任务。DSH 原生 guard 按实际 args 读取 action，底层另有独立开关校验。
+
+离线测试覆盖正式 stdio MCP → 临时真实 HTTP 主脑控制器 → 两个模拟派发 → Windows 私有管道与独立后台进程 → 一次完成 → 正式 received → delivery 仍未验收。第一项结束不会提前通知；原派发次数不变。测试不连接真实模型或用户 profile。升级和原生真实任务闭环尚待完成，不把源码候选当作已安装。
+
+### 0.2.6 本机安装核验
+
+用户完全退出 DSH 后，按原 0.2.5 收据升级至 0.2.6，候选 f1b61c8。实际八文件 SHA-256、新计划的十模块指纹、新旧收据及其他插件元数据一致；设置保持用户值，协作开关仍开启、范围仍 local_only，未自动启动 DSH 或重启面板。原文件备份及固定发布清单保留。
+
+运行目录部署后 Python 定向检查 94 项通过，并重新执行正式 MCP 的两任务批次通知/接收闭环通过。测试使用临时控制器/记录、假提供方或模拟执行提交，不使用用户原生会话、不调用真实模型。0.2.5 原生探针的人工结果与 0.2.6 真实任务闭环分别记录；后者仍待用户重新打开 DSH 后验证。
+
+### 0.2.6 原生单任务闭环及独立复核（2026-10-20）
+
+用户提供原生 DSH 验收结果：home 本地模型经已保存的 Pi Agent 完成一次真实任务；主脑确认 waiting=true 后结束原轮次，在无人继续发消息时自动返回，正式 received 后独立测试并 review accepted。该原生聊天行为来自人工观察，Codex 没有读取原始会话或认证文件。
+
+Codex 直接核对所属项目的任务、订阅、send.claim 和 review：原项目/owner/责任绑定一致，执行 completed，send_attempts=1、接收已登记、验收 8/8、rework_count=0。完成到发起通知约 0.924 秒，到接收登记约 3.512 秒。复核前后原记录 hash 不变，未改写 DSH 原拥有者的验收。
+
+实际两文件的 unittest 独立复跑 15 项通过；另以逐字符扫描 oracle 校验 3906 种短字符串组合及 12 类非 str 输入，通过。这里只说明本例结果，不将本地流程记录视为加密证明。通知 phase=reviewing 是接收时快照，验收以 review.json 为准；brain_describe 的能力字段不应误写成 brain_wait start 的回执字段。
+
+结论：保持原聊天打开且空闲时，单任务派发、后台等待、单次唤醒、接收和独立验收已通过。批量、故障、关闭/重启宿主、操作系统睡眠及跨工作区仍分别记录，不由本例推定。当前模型范围 all 是用户后续配置；本轮复核没有修改范围、预算或执行 Agent。
+
+### 正式工具链边界补测
+
+在临时项目、独立假宿主管道和模拟执行提交上，补充正式 stdio MCP → HTTP 控制器 → 后台进程 → 通知/接收的七种场景：
+
+| 场景 | 验证点 | 证据层级 |
+| --- | --- | --- |
+| 两任务批次 | 第一项完成仍等待，整批结束后只投递一次 | 隔离模拟 |
+| 原聊天忙碌 | 保持 waiting_chat_idle 且未发送，空闲后才投递 | 隔离模拟 |
+| failed | 保留失败状态，接收后为 needs_attention，不验收、不重派 | 隔离模拟 |
+| cancelled | 保留取消状态，不作为成功或重新执行 | 隔离模拟 |
+| recovery_pending | 发出需处理通知，不自动恢复或重新派发 | 隔离模拟 |
+| 投递结果未知 | send_attempts=1，后续查询/重复登记不重发 | 隔离模拟 |
+| 主动停止通知 | 发送次数为 0，原任务仍可完成，不取消任务 | 隔离模拟 |
+
+测试不调用真实执行模型，不连接用户原生聊天，不改运行产品；新增代码只有测试夹具。忙碌场景的首轮测试因输出标记被重复处理而失败，修正一次性标记后重新验证；原日志保留。原生批量验收需要从 DSH 当前聊天再发起，不能拿这些模拟结果冒充原生 GUI 验证。本轮不升级插件、不重启服务。
+
+### 同项目串行排队修复（2026-10-20）
+
+原生批次验收在第二项派发时返回结果未知，尚未建立批量等待。只读核对发现第一项已执行完成，第二项请求为 unknown、没有可归属的任务记录。保留原请求、任务与验收状态；不借用新 request_id 重派、不把未找到任务写成已明确拒绝。
+
+独立复现确认：旧控制器在同项目存在 running 任务时直接拒绝新的编辑任务，即使第一项属于现有单线程执行队列。异常发生在请求保留后，因此被请求账本保守记为 unknown。历史账本仅保留 ValueError 类别；复现与时间线支持该原因，不能声称获得了历史完整异常栈。
+
+控制器现在只允许在自己 ACTIVE 表内的运行任务后排队，沿用 max_workers=1，不引入模型并行。非本控制器管理的运行任务继续阻止派发，使用只在创建任务前抛出的 DispatchRefused；网关将这种确定拒绝记为 rejected。其他 ValueError 仍保持 unknown，同一请求不会重放。跨项目/拥有者、范围、预算、取消及验收规则继续生效。
+
+此前七场景夹具把两项都留在 queued，遗漏了第一项正在执行时的第二次派发；现已先标记第一项 running 并注册模拟队列拥有者。另用真实 ThreadPoolExecutor(max_workers=1) 加脚本化执行函数验证第二项必须等第一项退出才执行。七种正式 MCP/HTTP/后台进程/私有管道边界重测通过，定向 Python 259 项通过；全部使用临时记录和模拟执行，不调用真实模型。
+
+这是工作台后台修复，插件八文件及 0.2.6 版本不变。运行部署需先确认没有执行/排队任务；重启后台后原主脑连接需重新 brain_connect。旧安装计划的源码指纹可能过期，保留原收据和旧计划，不重写它们冒充重新安装。修复测试不替代新的原生批量唤醒验收。
+
+### 0.2.6 原生两任务批次验收（2026-10-20）
+
+用户在原生 DSH 聊天完成新批次：两个 home/Pi 任务各派发一次，共同登记一个 brain_wait，确认 waiting 后结束原轮次，无人继续发消息时收到整批事件，登记 received 后分别独立验收通过。原轮次结束、无人发消息及工具调用次数属于用户提供的原生报告；Codex 未读取原始聊天。
+
+Codex 只读核对所属项目记录：两项的项目/owner/责任绑定与同一订阅一致，独立请求各有一个 completed 回执，B 的创建时间位于 A 开始与结束之间，B 的开始时间晚于 A 结束。订阅为 received、send_attempts=1，且存在 send.claim；这证明已知记录中的串行排队和一次通知，不能把本地记录当作密码学证明或完整宿主历史。
+
+两项现有验收为 accepted（6/6、7/7），均无整改。Codex 用 Python 3.12.14 -B 复跑实际测试 12+22 项通过，并用不同写法的 oracle 补验 24336 对后缀组合、1092 个分块案例及 48 个非法输入案例，全部通过。四个业务文件及任务、验收、结果、通知记录复核前后 hash 不变；没有改写原拥有者的验收，没有真实模型调用，也没有重派旧 unknown 请求。
+
+结论：原聊天保持打开的正常场景，单任务和两任务批次的后台等待、完成后一次唤醒、接收与独立验收均已有原生实测及独立复核。本轮不升级插件、不重启服务。关闭聊天、重启宿主、OS 休眠、超过两项及跨工作区仍未原生验证；失败/取消/待恢复、忙碌及未知投递有隔离测试，不能冒称已在原生真实任务中验证。工具未返回独立发送时刻，本轮保持未知，不用心跳冒充发送时间。
+
+### 0.2.6 原生失败通知与失败状态读取修复（2026-10-20）
+
+受控只读诊断任务经用户授权终止自己的 Pi CLI。用户报告原回合结束后，无人继续发消息时自动返回；Codex 只读核对所属任务、订阅和故障助手 claim：执行 failed、验收 executor_failed 且未通过，通知 needs_attention、send_attempts=1、receipt 已登记，项目/owner/责任绑定匹配。控制台附属进程未成为故障助手目标，未重派或改写原验收。这是失败通知的原生证据，取消、待恢复、宿主重启/休眠和跨工作区仍分开记录。
+
+本轮同时暴露独立缺陷：brain_status 的成功响应包含执行失败文本 error，客户端却把任何非空 error 当成 RPC 错误，因而报告响应结构异常。用正式 stdio MCP/临时 HTTP 控制器复现后修正：status 校验任务结构并保留执行错误，HTTP/鉴权/unknown 检查仍先执行；其他操作的错误响应与变更不重试规则不放宽。status 保留兼容 error 字段，并与 delivery 一起新增 execution_error，交付读取也能说明实际失败原因。
+
+Python 定向 73 项通过；新增 failed/cancelled/recovery_pending 的正式状态/交付文本可见性、记录不变检查，并用安装版 DSH 客户端独立验证这些返回的投影。测试仅用临时记录和模拟执行，不调用真实模型。修复需要加载新的 brain_transport；当前常驻 MCP 进程不会因文件更新自动热重载。插件八文件及 0.2.6 版本不变，用户重新打开 DSH 后只需读取原失败任务，无需再做故障注入。2026-10-20 用户重新打开 DSH 后，只用正式工具读取同一失败任务，确认 status 与 delivery 均正常返回，error / execution_error 一致且非空，accepted=false、executor_failed 保持；未重新派发或登记通知。该原生读取由用户报告，Codex 另核对受保护的任务/通知/配置/插件等 17 个文件 hash 未变，关闭本项读取缺陷。
+
+### 共享执行器保护修复（不变更主脑插件 0.2.4）
+
+修正破坏性动词的边界，Format-List/Format-Table 不再命中 format。对于只包含已知只读命令和显式文件操作的简单复合命令，分别检查各条操作，避免把缓存清理与后续目录列表的管道混为项目根删除。带目录切换、变量、脚本、子表达式、复杂转义或写入管道的命令继续走原保守判断，不声称完整解析 Shell。记录路径、别名、通配符、根目录/上级目录和隐式破坏性管道仍有负例覆盖。
+
+DSH/Pi 共用有状态的执行保护：首次记录保护拒绝后，当前执行进程的写入/编辑/终端工具暂停，直接读取文件与最终报告仍可继续。执行器应保留原始拒绝、报告主脑，省略非必要清理；误拦截由主脑检查，不允许自行换工具重试。这不是跨进程持久锁或 OS 沙箱；控制器启动新执行会得到新 guard，仍受原权限、归属、会话指纹与验收规则约束。
+
+定向离线验收：纯策略与 Cordis 挂载 20 项；安装版 DSH + 生产 runner + 模拟提供方 32 项，涵盖 native/standard、无害缓存清理、拒绝后跨工具写入拦截、直接读取、只读任务及旧指纹拒绝；安装版 Pi + 生产 worker/relay + 模拟提供方 5 项；Python 保护/提示/指纹 21 项、上下文 28 项通过。全部使用临时项目与模拟模型接口，不使用真实余额/模型，不改用户设置。新增 Node 检查随源码保留；DSH 运行测试生成独立最小 profile，不复制用户配置。
