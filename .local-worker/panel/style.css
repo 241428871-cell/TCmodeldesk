@@ -292,6 +292,7 @@ dialog[open]{animation:dialog-in .16s ease-out}
 .detail-facts .label{display:block;margin-bottom:3px;font-size:var(--fs-xs)}
 .detail-facts .value .field-hint{display:block;margin-top:5px}
 .detail-facts .value{font-size:var(--fs-md);overflow-wrap:anywhere}
+.detail-facts .path-value{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono,ui-monospace,monospace);font-size:var(--fs-sm)}
 .detail-tabs{border-bottom:1px solid var(--line);display:flex;gap:18px;margin-top:16px}
 .detail-tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font-size:var(--fs-md);font-weight:550;padding:8px 0 9px;margin-bottom:-1px}
 .detail-tab:hover{color:var(--ink)}
@@ -519,6 +520,9 @@ footer{margin-top:28px;border-top:1px solid var(--line);padding-top:12px;display
 .execution-activity{display:flex;flex-direction:column;gap:4px;margin:0 0 14px;padding:9px 14px 9px 16px;border:1px solid var(--line);border-left:3px solid var(--st-run);border-radius:var(--r-lg);background:var(--surface);font-size:var(--fs-md);overflow-wrap:anywhere}
 .execution-activity>strong{color:var(--st-run)}
 .execution-activity>span{color:var(--ink-soft);font-size:var(--fs-sm)}
+.execution-activity .activity-job{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
+.execution-activity .activity-job>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.execution-activity .activity-job .text-button{flex-shrink:0}
 .activity-job{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:var(--fs-sm)}
 .activity-job button{white-space:normal;text-align:left}
 

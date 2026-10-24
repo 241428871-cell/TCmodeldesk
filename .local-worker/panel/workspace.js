@@ -84,6 +84,7 @@
   function renderHeader(project){
     const path=boundPath(),all=allView();
     el('desk-page-title').textContent=project?.name||(path?projectBaseName(path):all?'全部项目':'项目工作台');
+    el('desk-page-title').title=el('desk-page-title').textContent;
     el('desk-current-name').textContent=path?tabNames[activeTab]:all?'全部项目 · 任务汇总':'项目总览';
     const chip=el('desk-header-path');chip.hidden=!path;chip.textContent=shortPath(path);chip.title=path||'';
     document.body.dataset.project=path?'bound':all?'all':'none';

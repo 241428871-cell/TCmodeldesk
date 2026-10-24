@@ -1,5 +1,5 @@
 {
-  "project": "多agent协作",
+  "project": "TCmodeldesk",
   "license": "MIT",
   "release_date": "2026-10-23",
   "scope": "Git-tracked source files; excludes this manifest itself and ignored runtime data.",
@@ -546,8 +546,8 @@
     },
     {
       "path": ".local-worker/panel/app.js",
-      "sha256": "f4f8aaa8d7372e0de0e0639fd7b3889f2a13eee94d289c5fa7eca9e9e439ad72",
-      "bytes": 183038
+      "sha256": "0910f8f988755d642645b86698367f7b9e5b7618381a87024c701b43243196aa",
+      "bytes": 183695
     },
     {
       "path": ".local-worker/panel/codex-bridge.js",
@@ -576,8 +576,8 @@
     },
     {
       "path": ".local-worker/panel/index.html",
-      "sha256": "66fdaf2933463ff70573fdd4f4f4130dbf9762ba33f522d0b981786760622da8",
-      "bytes": 50916
+      "sha256": "16981906b4c563e0f673de555128714dc854ea7e937cfa8d4ac2f6227b0d942c",
+      "bytes": 52337
     },
     {
       "path": ".local-worker/panel/reconciliation.css",
@@ -591,18 +591,18 @@
     },
     {
       "path": ".local-worker/panel/style.css",
-      "sha256": "d7d766dac729026732e9302a3e5bb011ebf39dc20f253a915d143047f6d4c171",
-      "bytes": 44049
+      "sha256": "33565c0b391577c055d7a34254a33f6cdb8f8d863d2bd608a17df7355ba3f725",
+      "bytes": 44510
     },
     {
       "path": ".local-worker/panel/workspace.css",
-      "sha256": "e45a26f59585e5c2f31a17c0ef7848c3d6c0d348a8baa35a181a0d8a6ca3b294",
-      "bytes": 33164
+      "sha256": "60b2d467b82aead711cbec1d049cff4ecdbf45bd310e8e3662d9d5c7ac6526dd",
+      "bytes": 33583
     },
     {
       "path": ".local-worker/panel/workspace.js",
-      "sha256": "4aac2dee202933197864fafee8a7d73c6168718d725903fbd66aeb5c542d523f",
-      "bytes": 76115
+      "sha256": "c29fa8e73fdd51943ba7f752b20d101fe648ec4243190bf3f2f279b208ff345f",
+      "bytes": 76182
     },
     {
       "path": ".local-worker/panel_bundle.py",
@@ -1661,8 +1661,8 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "6a220d1a4c002779cead7667d89f2836de0d368d32e62655b95feb2c166e472a",
-      "bytes": 15617
+      "sha256": "f309a7b7304216fac2a6e3bf4da2033159f5e5409e56c43180081683b1ccdbb3",
+      "bytes": 16041
     },
     {
       "path": "LICENSE",
@@ -2310,14 +2310,24 @@
       "bytes": 80
     },
     {
+      "path": "desktop/assets/tcmodeldesk-logo.svg",
+      "sha256": "04c0cb21bab7a62d02b66f1d3f392b149b1961491acd9dcbc269bcbf607f371c",
+      "bytes": 717
+    },
+    {
+      "path": "desktop/assets/tcmodeldesk-menubar.svg",
+      "sha256": "519db3cc78d659c591b98a401fbe73cbec221b36104378bfeff34b9333385b83",
+      "bytes": 471
+    },
+    {
       "path": "desktop/backend_entry.py",
       "sha256": "8a803b3dd76ccf486bfda56054d22484b39315e67acbe0765416d9bee8ad0466",
       "bytes": 1465
     },
     {
       "path": "desktop/build_macos.py",
-      "sha256": "0dffd2a776bdf7e02e017000ac0c5cbeede4697806e6f049e38a130a614c471f",
-      "bytes": 6236
+      "sha256": "beee7e48ac85de4ed6a11020b5a9c1b6ba75992de550addca8fed3f7ded3533f",
+      "bytes": 6313
     },
     {
       "path": "desktop/desktop_runtime.py",
@@ -2331,13 +2341,13 @@
     },
     {
       "path": "desktop/macos/Icon.swift",
-      "sha256": "18edc867f82dee4eb1828954ab9c8c1471e7984605b249f3bc9518bca4e39ffd",
-      "bytes": 1409
+      "sha256": "3fa6158b6fe07b038bf35f4f4e2cb2a7c5dee4dcb88bd6ba95ef09dcfadac488",
+      "bytes": 4726
     },
     {
       "path": "desktop/macos/TCmodeldesk.swift",
-      "sha256": "7b844df5cc4a0d881889480efe3454f85d0d99d3490d398ddb5768fd59f1a992",
-      "bytes": 17966
+      "sha256": "425d5348afdf80c79e782955078030cd9cede881486112f05c3b3eb04659f76d",
+      "bytes": 24143
     },
     {
       "path": "desktop/package_dmg.py",
@@ -2441,8 +2451,8 @@
     },
     {
       "path": "docs/macOS应用.md",
-      "sha256": "52868f6d7f20b556d38490560268bffb34754766d6249a8b72833c4754199f78",
-      "bytes": 6566
+      "sha256": "15eaac0bafe0f56dff4fecc891fab7bd42fd230917970c72ea1f11909c2f9bd1",
+      "bytes": 9319
     },
     {
       "path": "docs/写回恢复协议.md",
@@ -2491,8 +2501,8 @@
     },
     {
       "path": "docs/重构进度.md",
-      "sha256": "6b59d47349347c1bf25d912945557a1c3b7f8d12554ace387c6dbb31e7d6f1c4",
-      "bytes": 178849
+      "sha256": "602ee5a3a6001887bac968d34ee9652e6445bc10f57b690227a6bfa868cd1558",
+      "bytes": 182096
     },
     {
       "path": "environment.yml",
@@ -2595,6 +2605,6 @@
       "bytes": 1658
     }
   ],
-  "repository": "https://github.com/Gambler134201/multi-agent-collaboration",
+  "repository": "https://github.com/241428871-cell/TCmodeldesk",
   "copyright": "Copyright (c) 2026 Gambler134201"
 }

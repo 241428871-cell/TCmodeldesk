@@ -28,8 +28,8 @@
 在 macOS 的指定 Anaconda 开发环境安装 `desktop/requirements-build.txt`，先按原安装流程准备 Node 22 与锁定 acpx 依赖，然后运行：
 
 ```sh
-conda run -n aad-control python desktop/build_macos.py --output dist/macos-modeldesk
-conda run -n aad-control python desktop/package_dmg.py dist/macos-modeldesk/TCmodeldesk.app dist/TCmodeldesk-0.3.1-macOS-arm64.dmg
+conda run -n aad-control python desktop/build_macos.py --output dist/macos-polish-release
+conda run -n aad-control python desktop/package_dmg.py dist/macos-polish-release/TCmodeldesk.app dist/TCmodeldesk-0.3.2-macOS-arm64.dmg
 ```
 
 构建需要 Apple Command Line Tools；用户运行 App 无需它。源码与第三方依赖通过白名单复制，不读取模型配置、密钥、会话、任务和项目数据库。运行时许可文本位于应用 Resources/licenses。当前构建为 Apple Silicon arm64，应用声明 macOS 13+；实际原生验证只覆盖本机。只有本地签名，未使用 Developer ID／未公证，不代表已完成其他 Mac 或 Intel 发行验收。
@@ -48,4 +48,20 @@ conda run -n aad-control python desktop/package_dmg.py dist/macos-modeldesk/TCmo
 
 ## TCmodeldesk 0.3.1 改名与退出验收
 
-本轮 23 项桌面／控制器检查、Swift 与 Python 类型检查通过。隔离原生窗口验证关闭后恢复、忙碌退出提示与空闲退出后前后端均结束；实际冻结后端在最小 PATH 下验证冷启动、同 PID 复用、安全退出和重复停止不重启，未启动模型。菜单栏采用 NSStatusItem，程序坞使用 regular 激活策略；CUA 无法捕获系统菜单栏／Dock，二者的最终视觉与菜单点击仍需原生检查。旧自管安装继续使用其已有业务源码，当前没有自动源码升级器；连接原安装也不会覆盖其界面和数据。后续润色任务见 [Claude 界面交接](Claude界面润色.md)。
+本轮 23 项桌面／控制器检查、Swift 与 Python 类型检查通过。隔离原生窗口验证关闭后恢复、忙碌退出提示与空闲退出后前后端均结束；实际冻结后端在最小 PATH 下验证冷启动、同 PID 复用、安全退出和重复停止不重启，未启动模型。菜单栏采用 NSStatusItem，程序坞使用 regular 激活策略；CUA 无法捕获系统菜单栏／Dock，二者的最终视觉与菜单点击仍需原生检查（窗口本身与应用菜单已用预览版逐项核对）。旧自管安装继续使用其已有业务源码，当前没有自动源码升级器；连接原安装也不会覆盖其界面和数据。后续润色任务见 [Claude 界面交接](Claude界面润色.md)。
+
+## 品牌与异常界面（界面润色轮）
+
+- 图标：深靛色圆角方块上的“决策节点（白）→ 两个执行节点（绿＝就绪、琥珀＝等待）”图形，与工作台状态色一致。源为 `desktop/macos/Icon.swift`（构建时由 `desktop/build_macos.py` 生成 icns），矢量版在 `desktop/assets/tcmodeldesk-logo.svg`；网页侧栏徽标与浏览器标签图标使用同一几何。
+- 菜单栏：`NSStatusItem` 使用代码绘制的单色模板图标（`desktop/assets/tcmodeldesk-menubar.svg` 为同形矢量），随浅深色自动着色。
+- 连接失败页提供“重新连接／连接已有工作台…／数据位置与迁移…”；页面加载中断或网页进程被系统回收时显示失败页或自动重载，不留静默失败。后台无可用连接信息时给出中文说明，不再显示系统原始错误。
+- 关闭窗口走“窗口 → 关闭窗口（应用继续在程序坞和菜单栏运行）”，⌘W 同效；系统关机／注销被忙碌状态阻止时，退出失败提示会注明是关机或注销被取消。
+- 仍需人工原生检查：Dock 图标与菜单栏图标的实际观感、系统菜单点击。
+
+## 0.3.2 收尾核对
+
+本轮重新构建真实冻结后端与原生应用，目录／控制器 23 项、八组隔离浏览器检查和类型检查通过。一次性安装通过生产接口创建长名称项目与模型配置，原生窗口核对名称显示、模型库及品牌；财务账户展示使用空夹具，不读取真实账户，不启动模型。实际停止一次性后台后出现断线页，点击重新连接恢复完整工作台。修正页面恢复后仍可能隐藏、取消导航误报，以及未经证明就断言后台不存在／仍运行的提示；重连失败保留已知后台身份，退出检查期间防止切换安装。
+
+原生数据菜单实际迁移一次性安装：模型配置和缓存标记哈希一致、路径指针切换、新后台启动、旧后台退出、源副本与项目源码保留。关闭窗口后可恢复同一窗口，明确退出后窗口和自管测试后台均结束。菜单栏和 Dock 的最终系统级图标观感／菜单点击仍受本机捕获工具限制，不能据窗口截图声称已覆盖；原生菜单图标已按模板图像接线。全新包是本机 arm64、本地签名，未公证；旧安装没有自动源码升级器，不能通过覆盖配置来升级。
+
+打包窗口现显式以 macOS 13.0 为构建目标，修正宿主工具链默认生成 macOS 27.0 最低版本的偏差；产物的 LC_BUILD_VERSION 与应用声明一致。此项是二进制元数据核对，不代替在旧版 macOS 的实际运行验收。

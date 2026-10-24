@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" role="img" aria-label="TCmodeldesk">
+  <!-- Template glyph: monochrome, macOS tints it for light, dark and highlighted menu bars. -->
+  <path d="M9 4.2 4.6 12.8M9 4.2l4.4 8.6M4.6 12.8h8.8" stroke="#000" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <circle cx="9" cy="4.2" r="2.7" fill="#000"/><circle cx="4.6" cy="12.8" r="2.3" fill="#000"/><circle cx="13.4" cy="12.8" r="2.3" fill="#000"/>
+</svg>

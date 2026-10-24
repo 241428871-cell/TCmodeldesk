@@ -65,4 +65,6 @@ The desktop distribution reuses this complete UI inside a system WKWebView. An A
 
 ## TCmodeldesk native lifecycle
 
-The AppKit app keeps regular Dock activation and an NSStatusItem menu while running. Closing its window preserves those visible entrypoints. Explicit quit and installation switching stop only an idle, identity-verified owned backend; active or unknown resources keep the app open with an actionable error. External installations are disconnected without shutdown. Use the existing visual language; current TC / M placeholders need a complete app and template menu-bar icon set.
+The AppKit app keeps regular Dock activation and an NSStatusItem menu while running. Closing its window preserves those visible entrypoints. Explicit quit and installation switching stop only an idle, identity-verified owned backend; active or unknown resources keep the app open with an actionable error. External installations are disconnected without shutdown. Use the existing visual language; the app and sidebar use a decision node connected to green and amber execution nodes. The menu-bar glyph uses the same geometry as a monochrome template image. Connection failures keep retry, installation selection and data-location actions available. Navigation recovery restores the web surface; unknown backend state is reported as unknown.
+
+The native executable deployment target matches the declared macOS 13.0 minimum; this metadata contract does not imply older macOS has been manually accepted.
