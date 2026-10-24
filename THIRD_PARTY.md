@@ -1,6 +1,6 @@
 # 第三方依赖与外部应用
 
-本目录提供本项目源码，不附带 Python/Node 运行环境、依赖安装目录、DSH/Pi/Codex/WorkBuddy 应用或这些应用的用户数据。
+源码分发不附带运行环境、账户或记录。新增 macOS App 构建会单独打包 Python、Node 与后端依赖，并把安装分发中可取得的许可文本放在 `Contents/Resources/licenses`。不会打包 Codex、DSH、Claude、cswap、Pi、WorkBuddy 应用或这些应用的用户数据。
 
 ## 直接依赖
 
@@ -19,6 +19,8 @@ Python 清单见 requirements.txt；Node 直接依赖与传递依赖见 .local-w
 ## 用户单独安装
 
 DSH（DeepSeek Harness）、Pi Agent、Codex、WorkBuddy、Python、Node 和 pnpm 由使用者独立安装。本项目只提供适配代码，未将它们的程序、SDK安装目录、原生探测目录或用户配置复制到源码包。
+
+macOS App 用户无需另装 Python／Node；源码开发及构建仍使用独立环境。PyInstaller 6.22.3 用于生成后端，并随构建收集其 bootloader 许可和例外条款；原生窗口使用 macOS 系统 AppKit／WebKit，不复制系统框架。App 当前仅做本机签名，Developer ID 签名与公证不包含在本次本机构建中。
 
 WorkBuddy 适配使用用户本机已安装应用提供的原生能力；账户、积分、模型访问和第三方服务条件由对应平台管理，不随本项目的 MIT 许可授予。
 

@@ -59,3 +59,6 @@ The actual temporary-project UI was exercised for cancellation, stale evidence, 
 任务资源核对复用 route-note、detail-facts、field-hint 和原生按钮。只有点击“核对资源与写回”才读取进程和文件证据，不加入轮询。结果标注核对时间、租约阶段、受管会话证明范围与逐文件状态；异常显示未知，绝不显示为空闲。切换任务／项目或原任务代次变化即丢弃旧结果。保存文件的恢复按钮明确“恢复文件写回”，保留原确认和后端授权复核；读取证据不释放租约、不启动模型，不代表允许执行。
 
 持久租约任务待恢复时提供“停止任务并保留成果”，取消后若资源未释放则提供“重试停止残留进程”；沿用secondary按钮和session-note，不增加弹窗或轮询。明确取消后不能恢复写回，信号已发送不等同于退出已确认；结果分别显示资源已释放／仍待核对／未知。
+# Native macOS shell
+
+The desktop distribution reuses this complete UI inside a system WKWebView. An AppKit titled window starts at 1360×900 points with a 760×540 minimum and restores its frame; the existing responsive rules continue to own the inner surface. The app menu provides Data location and migration, Connect existing workbench, and Use independent workbench. Native NSAlert and NSOpenPanel own the data-location explanation and destination picker. Busy/error feedback uses a native spinner and readable message, and migration blocks termination until the operation returns. No new web color, spacing token, animation or general JavaScript-to-shell bridge is added. Closing the window and quitting the shell preserve backend execution ownership.

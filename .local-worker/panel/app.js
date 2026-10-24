@@ -199,8 +199,9 @@ const viewQuery=new URLSearchParams(window.location.search);
 // The DSH native right-sidebar entry adds host=dsh as a display-only context.
 // It never authorizes a mutation, selects a project or proves an identity.
 const isDshHost=viewQuery.get('host')==='dsh';
-const hostName=()=>isDshHost?'DSH':'Codex';
-const mainBrainName=()=>isDshHost?'DSH 主脑':'GPT';
+const isDesktopHost=viewQuery.get('host')==='desktop';
+const hostName=()=>isDesktopHost?'TCworkdesk':isDshHost?'DSH':'Codex';
+const mainBrainName=()=>isDesktopHost?'项目主脑':isDshHost?'DSH 主脑':'GPT';
 let rememberedPanelView=null;
 // Session storage belongs to this HTTP panel tab, never a global last-project.
 // A new MCP entry without trustworthy context stays unbound and offers explicit recovery.

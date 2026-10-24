@@ -60,6 +60,7 @@ HERE = Path(__file__).resolve().parent
 WEB = HERE / "panel"
 PYTHON = platform_runtime.worker_python(HERE)
 TOKEN = secrets.token_urlsafe(32)
+DESKTOP_MANAGED = False
 
 
 class PanelSessionExpired(PermissionError):
@@ -2444,6 +2445,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(governed)
             if path == "/api/session":
                 return self.send_json({"token": TOKEN})
+            if path == '/api/desktop/identity':
+                return self.send_json({'product': 'TCworkdesk', 'protocol': 1,
+                    'workspace': str(HERE.parent.resolve()),
+                    'url': f'http://127.0.0.1:{self.server.server_port}',
+                    'pid': os.getpid(), 'birth': platform_runtime.process_birth(os.getpid()),
+                    'managed': bool(globals().get('DESKTOP_MANAGED', False))})
             if path == "/api/state":
                 settings = workflow_settings.snapshot()
                 models = registry.list_models()

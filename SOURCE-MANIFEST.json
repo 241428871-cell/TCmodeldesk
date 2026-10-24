@@ -546,8 +546,8 @@
     },
     {
       "path": ".local-worker/panel/app.js",
-      "sha256": "201c4fa651900c071e69fea6ac8a0ccc373947bd2b553db00a0f70d368947792",
-      "bytes": 182930
+      "sha256": "3a63209e9ca00fbaeb683f613d59d1a0fe8a248d00cc2ec0c13a6edac9343a41",
+      "bytes": 183041
     },
     {
       "path": ".local-worker/panel/codex-bridge.js",
@@ -616,8 +616,8 @@
     },
     {
       "path": ".local-worker/panel_server.py",
-      "sha256": "56995a5c9223484eaed7890219fe6b86fed6620b9c7f2a731e1648dd5348b476",
-      "bytes": 166855
+      "sha256": "763840525a3682e8a8aa3a3c6929c74596476085bb79c6ba8572d5d67a7b1bb0",
+      "bytes": 167314
     },
     {
       "path": ".local-worker/panel_service.py",
@@ -1661,8 +1661,8 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "ba41896e303eeea2d2b3ce19618ccc91280979206fe587de964976c36f8cae42",
-      "bytes": 14347
+      "sha256": "afcbacb1881db6f76a9c9388321880ae1499a994c9ba13809fb2ace0a279a1cd",
+      "bytes": 15105
     },
     {
       "path": "LICENSE",
@@ -1671,13 +1671,13 @@
     },
     {
       "path": "README.md",
-      "sha256": "1e383cb86c8b9844a7dbbbda6bf7df26dd3b3c1aff8058dbbd8b5761cd129eb8",
-      "bytes": 13265
+      "sha256": "774681b06fce16019e16f39a3069445477587a60ef1dc68e0315b104672fc7b0",
+      "bytes": 13668
     },
     {
       "path": "THIRD_PARTY.md",
-      "sha256": "e3517dd12eb758e89d4dd66fa7af33129278b9109cff93d41a56b5456101a95c",
-      "bytes": 1310
+      "sha256": "f605386cec7962a36698aeb36cad7d2d20388347cf5fa77edce3c18781091b86",
+      "bytes": 1822
     },
     {
       "path": "control-plane/README.md",
@@ -2300,14 +2300,69 @@
       "bytes": 415425
     },
     {
+      "path": "desktop/TCBackend.spec",
+      "sha256": "7abaafda1be328eb9d3f1d78079193b0e480776d519e2516143f2020825b9959",
+      "bytes": 1828
+    },
+    {
+      "path": "desktop/__init__.py",
+      "sha256": "65395426d0b69b0ddf72e2e3ad4588480a45c474c0c0d764489072bf04bcce22",
+      "bytes": 80
+    },
+    {
+      "path": "desktop/backend_entry.py",
+      "sha256": "989535891b1ea894cb3f52861af50cda1af85632a7af298702c6fa85483337f9",
+      "bytes": 1466
+    },
+    {
+      "path": "desktop/build_macos.py",
+      "sha256": "58831d84989223b2e1f1d84a1ae620f3351f20afd749ed4ba48f79ebe031bcac",
+      "bytes": 6225
+    },
+    {
+      "path": "desktop/desktop_runtime.py",
+      "sha256": "9d582687abe423bd6b5e4b6275969fc246b51b1795eb90ee792d101654cccd67",
+      "bytes": 13292
+    },
+    {
+      "path": "desktop/macos/Icon.swift",
+      "sha256": "18edc867f82dee4eb1828954ab9c8c1471e7984605b249f3bc9518bca4e39ffd",
+      "bytes": 1409
+    },
+    {
+      "path": "desktop/macos/TCworkdesk.swift",
+      "sha256": "982ffffb71875db9577ae40364da92ede85e11c4262563b95a525c42b2982e4d",
+      "bytes": 13932
+    },
+    {
+      "path": "desktop/package_dmg.py",
+      "sha256": "8a82f013ff86b31219a7c5bd721463174595aec9cdeb08b1b569b3ecee7b3217",
+      "bytes": 2128
+    },
+    {
+      "path": "desktop/pyrightconfig.json",
+      "sha256": "aa75f84dea861bde1297baff25ec9c5007d503874975cfcd547fa06c13edb3cd",
+      "bytes": 183
+    },
+    {
+      "path": "desktop/requirements-build.txt",
+      "sha256": "4439c693c19271e4b0bdc56c641c36b3b06010b1b22eae6733cd244d752e85d5",
+      "bytes": 20
+    },
+    {
+      "path": "desktop/tests/test_desktop_runtime.py",
+      "sha256": "6c215ecaa05dca193f2dced2842cc0a147d7dd7c993affab4289d0fe0d744760",
+      "bytes": 4272
+    },
+    {
       "path": "docs/AGENT_INSTALL.md",
       "sha256": "0a59eb2ca88be55587a6d83487b33c784d37edb2dd6c39cffb2fe804a163bbd1",
       "bytes": 8743
     },
     {
       "path": "docs/CROSS_HOST_FEATURES.md",
-      "sha256": "b0850f5978de8c98c526ddd1c969c8968b9f8ac6e5d017478a93c94ec745fcb6",
-      "bytes": 34363
+      "sha256": "3c034ff7fc7e9477d74139b4e5a455f5f4033d7d8ba6b23cbe5c9e08bc27bc7c",
+      "bytes": 35255
     },
     {
       "path": "docs/DSH_BRAIN_PLUGIN.md",
@@ -2375,6 +2430,11 @@
       "bytes": 111763
     },
     {
+      "path": "docs/macOS应用.md",
+      "sha256": "d7ae1b91409e45e8a2ef4a7bfdb8d673c18d3849a428dfb5b65f9d933dc46bb8",
+      "bytes": 5174
+    },
+    {
       "path": "docs/写回恢复协议.md",
       "sha256": "0ce578f75561a3df1237f042af03442704f6696320b5822933cd957c3a9b1140",
       "bytes": 7070
@@ -2421,8 +2481,8 @@
     },
     {
       "path": "docs/重构进度.md",
-      "sha256": "178acf0c43a9a9e23e3f16f14b36372a1ac8f36716e0a51ad28fbfb83d2ee7a5",
-      "bytes": 175604
+      "sha256": "b2ce788573bd0f7ff1d513362ce3fb1153d3c2705f500082e3ffb64a12b3ec88",
+      "bytes": 177124
     },
     {
       "path": "environment.yml",

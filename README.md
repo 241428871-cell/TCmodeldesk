@@ -155,3 +155,6 @@ docs/USAGE.md                 每模型默认 Agent、目标进度、离线与�
 本项目采用 [MIT 许可证](LICENSE)。第三方依赖和外部应用的许可见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
 Linux 桌面适配、任意 DSH/Pi 版本兼容、Aider 路径的开箱即用，均不在当前范围内。Windows 兼容代码保留，但不属于当前交付验收。
+# macOS 独立应用
+
+新增 TCworkdesk 原生 `.app` 窗口与安装镜像构建，复用工作台界面，自带 Python／Node 后端。默认应用数据在系统盘用户目录，可从原生菜单选择位置并一键迁移；也能连接已有安装。Codex、DSH、Claude 与账户保持外部适配。使用、构建、迁移范围和验证边界见 [macOS 应用说明](docs/macOS应用.md)。
