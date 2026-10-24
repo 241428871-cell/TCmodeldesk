@@ -2391,7 +2391,7 @@
     },
     {
       "path": "desktop/build_macos.py",
-      "sha256": "fe8a27e6c88fb1210d07f8b9a836dc1ddfa3e4a801d9612c8d912eb6b9f2e4c4",
+      "sha256": "edd788b1fcd39f060fb6184145ef7d21bb3d96feaacf2ebdd6012256df19fb8d",
       "bytes": 6379
     },
     {
@@ -2416,7 +2416,7 @@
     },
     {
       "path": "desktop/macos/TCmodeldesk.swift",
-      "sha256": "7b5bf8cc217b03af78d202af1aae8d615cf37fc950697661379eeae4254cc658",
+      "sha256": "c98f99b946b64c718fe624b23877081a58fb2b6367d0cb48922df179d3cd3902",
       "bytes": 24143
     },
     {
@@ -2581,8 +2581,8 @@
     },
     {
       "path": "docs/重构进度.md",
-      "sha256": "b6587ef3adcafff1ec7d94ed6170b5a0eefc0075f83cee40fbddf1264440ac4d",
-      "bytes": 185499
+      "sha256": "46a26b25f3c13cc8135ec68848634a1b114d98ac5ac0b811a847be9624678d34",
+      "bytes": 186479
     },
     {
       "path": "environment.yml",

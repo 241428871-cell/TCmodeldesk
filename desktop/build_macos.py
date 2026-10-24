@@ -98,8 +98,8 @@ def main() -> None:
     copy_notices(resources)
     info = {'CFBundleIdentifier': 'local.tcmodeldesk.desktop', 'CFBundleName': 'TCmodeldesk',
         'CFBundleDisplayName': 'TCmodeldesk', 'CFBundleExecutable': 'TCmodeldesk',
-        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.5',
-        'CFBundleVersion': '6', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
+        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.6',
+        'CFBundleVersion': '7', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
         'CFBundleIconFile': 'TCmodeldesk',
         'NSPrincipalClass': 'NSApplication', 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}
     with (contents / 'Info.plist').open('wb') as handle:

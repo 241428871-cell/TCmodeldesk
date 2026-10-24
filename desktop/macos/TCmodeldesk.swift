@@ -376,7 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
     }
     @objc private func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     @objc private func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "TCmodeldesk", .applicationVersion: "0.3.5",
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "TCmodeldesk", .applicationVersion: "0.3.6",
             .credits: NSAttributedString(string: "原生 macOS 窗口 · 本地多智能体工作台\n关闭窗口后保留程序坞和菜单栏入口；退出先检查运行任务。\n基于 Gambler134201/multi-agent-collaboration · MIT")])
     }
     private func showError(_ message: String) { let alert = NSAlert(); alert.messageText = "操作未完成"; alert.informativeText = message; alert.runModal() }
