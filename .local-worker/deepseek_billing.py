@@ -124,6 +124,9 @@ def cache_identity(public_row):
     row = next((r for r in data["models"] if r["id"] == public_row["id"]), None)
     if row is None:
         raise ValueError("模型不存在")
+    if row.get('account_id'):
+        import connection_accounts
+        row = {**row, **connection_accounts.connection(row['account_id'])}
     identity = json.dumps({"base": row["api_base"], "secret": row.get("secret", ""),
         "proxy": row.get("bypass_proxy"), "env": os.environ.get(row.get("api_key_env", ""), "")})
     return row["id"], hashlib.sha256(identity.encode()).hexdigest()
@@ -131,7 +134,7 @@ def cache_identity(public_row):
 
 def balance_error(exc):
     if isinstance(exc, HTTPError):
-        return {401: "API Key 认证失败，请在模型配置中检查密钥", 402: "账户余额不足，请前往官方充值",
+        return {401: "API Key 认证失败，请在账户管理中检查密钥", 402: "账户余额不足，请前往官方充值",
                 429: "查询过于频繁，请稍后刷新"}.get(exc.code, f"余额接口暂时不可用（HTTP {exc.code}）")
     if isinstance(exc, ValueError):
         return str(exc)

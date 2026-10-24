@@ -6,7 +6,7 @@ html,body{height:100%;overflow:hidden}
 /* ---------- sidebar ---------- */
 .project-sidebar{display:flex;flex-direction:column;background:var(--sidebar);border-right:1px solid var(--line);min-height:0;min-width:0;z-index:20;overflow-y:auto;overscroll-behavior:contain}
 .sidebar-brand{display:flex;gap:10px;align-items:center;padding:16px 16px 12px;flex-shrink:0}
-.desk-mark{display:grid;place-items:center;width:30px;height:30px;background:var(--brand-bg);color:var(--brand-ink);font-size:15px;font-weight:750;border-radius:9px;letter-spacing:-.04em;flex-shrink:0}
+.desk-logo{width:32px;height:32px;flex-shrink:0;border-radius:9px;box-shadow:0 1px 2px color-mix(in srgb,#000 22%,transparent)}
 .brand-text{display:flex;flex-direction:column;min-width:0;line-height:1.25}
 .brand-text strong{font-size:15px;letter-spacing:-.01em}
 .brand-text .sync{font-size:var(--fs-xs)}
@@ -339,3 +339,9 @@ html,body{overflow:auto}
 .engine-source-form label{display:grid;gap:var(--desk-s1);max-inline-size:100%;font-size:var(--fs-sm);color:var(--ink-soft)}
 .engine-source-form select{max-inline-size:100%}
 .engine-source-path{font-family:var(--mono);font-size:var(--fs-xs);color:var(--muted);overflow-wrap:anywhere;margin-block:var(--desk-s2)}
+
+.workflow-group{margin:16px 0 4px;padding-top:12px;border-top:1px solid var(--line);font-size:var(--fs-sm);font-weight:600;color:var(--ink-soft);letter-spacing:.02em}
+.workflow-group:first-of-type{border-top:0}
+.workflow-billing-note{margin-top:14px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.workflow-billing-note summary{cursor:pointer;font-size:var(--fs-sm);color:var(--ink-soft)}
+.workflow-billing-note .field-hint{margin:8px 0 0}

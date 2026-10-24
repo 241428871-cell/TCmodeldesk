@@ -16,6 +16,7 @@ import execution_endpoints
 import model_registry as registry
 import panel_server as panel
 import platform_runtime
+import project_defaults
 import provider_accounts
 import stage_store
 import workflow_settings
@@ -48,6 +49,97 @@ class WorkspaceTests(unittest.TestCase):
 
     def bind(self, **values):
         return workspace.update_binding({'project': str(self.project), 'model_id': self.model['id'], **values})
+
+    def test_saved_project_defaults_clone_new_bindings_without_copying_records_or_secrets(self):
+        self.register()
+        self.bind(role='decision', is_default=True, effort='xhigh', context_window=1000000, autocompact_tokens=450000)
+        self.bind(role='execution', is_default=True, effort='low', context_window=500000, autocompact_tokens=250000,
+                  max_instances=2, collaboration_hint='Review changes independently')
+        workspace.update_project({'action': 'concurrency', 'path': str(self.project), 'work_concurrency': 16})
+        before = (self.root / 'desk/workspace.json').read_bytes()
+        model_before = registry.REGISTRY.read_bytes()
+        with patch('dsh_metadata.probe', side_effect=AssertionError('unexpected model probe')):
+            saved = project_defaults.capture(str(self.project))
+            created = workspace.update_project({'action': 'add', 'path': str(self.other)})
+        self.assertEqual(saved['model_count'], 2)
+        self.assertEqual(saved['work_concurrency'], 16)
+        old, new = created['projects']
+        self.assertEqual(json.loads(before)['projects'][0], old)
+        self.assertEqual(new['work_concurrency'], 16)
+        self.assertEqual([{k:v for k,v in b.items() if k!='id'} for b in old['bindings']],
+                         [{k:v for k,v in b.items() if k!='id'} for b in new['bindings']])
+        self.assertTrue({b['id'] for b in old['bindings']}.isdisjoint(b['id'] for b in new['bindings']))
+        self.assertFalse((self.other / '.model-desk').exists())
+        self.assertEqual(registry.REGISTRY.read_bytes(), model_before)
+        template = json.loads((registry.HERE / project_defaults.NAME).read_bytes())
+        self.assertEqual(set(template), {'schema', 'updated_at', 'work_concurrency', 'bindings'})
+        self.assertTrue(all(set(row).isdisjoint({'id','secret','api_key','account_id','project','path'}) for row in template['bindings']))
+
+    def test_new_default_template_does_not_rewrite_existing_projects(self):
+        self.register()
+        self.bind(role='decision', effort='high')
+        self.register(self.other)
+        project_defaults.capture(str(self.project))
+        existing = workspace.update_project({'action': 'add', 'path': str(self.other)})['projects'][1]
+        self.assertEqual(existing['bindings'], [])
+        self.assertEqual(existing['work_concurrency'], 8)
+
+    def test_default_template_does_not_switch_to_replacement_model(self):
+        self.register()
+        self.bind(role='decision')
+        project_defaults.capture(str(self.project))
+        with registry.registry_lock():
+            data = registry.read_registry()
+            data['models'][0]['model'] = 'different-model'
+            registry.write_json(registry.REGISTRY, data)
+        before = (registry.HERE / 'workspace.json').read_bytes()
+        with self.assertRaises(project_defaults.DefaultsError):
+            workspace.update_project({'action': 'add', 'path': str(self.other)})
+        self.assertEqual((registry.HERE / 'workspace.json').read_bytes(), before)
+
+    def test_corrupt_default_template_blocks_new_project_but_not_existing_snapshot(self):
+        self.register()
+        registry.write_json(registry.HERE / project_defaults.NAME, {'work_concurrency': True})
+        self.assertFalse(workspace.snapshot()['project_defaults']['readable'])
+        before = (registry.HERE / 'workspace.json').read_bytes()
+        with self.assertRaises(ValueError):
+            workspace.update_project({'action': 'add', 'path': str(self.other)})
+        self.assertEqual((registry.HERE / 'workspace.json').read_bytes(), before)
+
+    def test_bookmarked_project_adoption_inherits_defaults_once(self):
+        self.register()
+        self.bind(role='decision', effort='xhigh')
+        project_defaults.capture(str(self.project))
+        with patch.object(workspace.project_views, 'project_bookmarks', return_value=[{'path': str(self.other)}]):
+            created = workspace.update_project({'action': 'add', 'path': str(self.other)})['projects'][1]
+        self.assertEqual(created['bindings'][0]['effort'], 'xhigh')
+        self.assertTrue(created['managed'])
+
+    def test_project_model_keeps_thinking_capabilities_without_probing_or_rewriting(self):
+        self.register()
+        model = registry.upsert_model({'provider': 'deepseek', 'name': 'Official Flash',
+            'model': 'deepseek-flash', 'api_base': 'https://api.deepseek.com',
+            'default_agent': 'dsh'})
+        self.bind(model_id=model['id'], role='execution')
+        before = registry.REGISTRY.read_bytes()
+        with patch('thinking_config.probe', side_effect=AssertionError('unexpected probe')):
+            binding = workspace.snapshot()['projects'][0]['bindings'][0]
+        self.assertEqual(binding['model']['thinking']['supported'], ['default', 'off', 'low', 'high', 'max'])
+        self.assertEqual(binding['model']['thinking']['default_effort'], 'high')
+        self.assertEqual(registry.REGISTRY.read_bytes(), before)
+
+    def test_project_native_dsh_capabilities_follow_exact_cached_route(self):
+        self.register()
+        ident = '["deepseek-account","deepseek-flash"]'
+        model = registry.upsert_model({'provider': 'dsh', 'name': 'Native Flash',
+            'model': ident, 'default_agent': 'dsh'})
+        self.bind(model_id=model['id'], role='execution')
+        with patch.dict(provider_accounts._CATALOGS, {'dsh': {'models': [
+                {'id': ident, 'effort_levels': ['off', 'high']},
+                {'id': '["deepseek-official","deepseek-flash"]', 'effort_levels': ['low', 'max']}]}}, clear=True), \
+                patch('dsh_metadata.probe', side_effect=AssertionError('unexpected CLI launch')):
+            binding = workspace.snapshot()['projects'][0]['bindings'][0]
+        self.assertEqual(binding['model']['thinking']['supported'], ['default', 'off', 'high'])
 
     def test_enforcement_is_role_specific_and_does_not_dispatch(self) -> None:
         self.register()
@@ -91,7 +183,7 @@ class WorkspaceTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(workspace.WorkspaceError):
                 workspace.update_project({'action': 'concurrency', 'path': str(self.project),
                                           'work_concurrency': value})
-        self.assertEqual(workspace.work_concurrency(str(self.project)), 1)
+        self.assertEqual(workspace.work_concurrency(str(self.project)), 8)
 
     def test_waiting_reasons_are_scoped_to_their_own_project(self):
         import execution_leases
@@ -343,6 +435,8 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(registry.read_task(registry.task_dir(result['id']))['cli_runtime']['effort'], 'high')
 
     def test_http_catalog_and_refresh_are_explicit_while_workspace_get_is_cached(self):
+        self.register()
+        self.bind(role='decision', effort='xhigh')
         server = ThreadingHTTPServer(('127.0.0.1', 0), panel.Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -360,9 +454,14 @@ class WorkspaceTests(unittest.TestCase):
                  patch.object(provider_accounts, 'catalog', return_value={'models': []}) as catalog:
                 result = request('/api/workspace')
                 self.assertIn('projects', result)
-                self.assertEqual(set(result['catalogs']), {'codex_cli', 'claude_cli'})
-                self.assertEqual(cached.call_count, 2)
+                self.assertEqual(set(result['catalogs']), {'codex_cli', 'claude_cli', 'dsh'})
+                self.assertEqual(cached.call_count, 3)
                 self.assertTrue(all(not c.kwargs.get('force') for c in account.call_args_list))
+                catalog.assert_not_called()
+                saved = request('/api/workspace/defaults', {'project': str(self.project)})
+                self.assertTrue(saved['configured'])
+                self.assertEqual(saved['model_count'], 1)
+                self.assertTrue(request('/api/workspace')['project_defaults']['configured'])
                 catalog.assert_not_called()
                 request('/api/provider-catalog', {'provider': 'codex_cli'})
                 catalog.assert_called_once_with('codex_cli')

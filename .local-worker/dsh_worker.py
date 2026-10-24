@@ -15,6 +15,7 @@ import budget_relay
 import context_manager
 import deepseek_billing
 import delegation_policy
+import dsh_runtime
 import endpoint_access
 import executor_adapter
 import model_capabilities
@@ -134,6 +135,8 @@ def fingerprint(model, kind, project, preset=None, access='full'):
         # session identity, so an old edit session is refused with "create a new
         # task" instead of running without write protection.
         data += ['record-protection', record_protection.revision()]
+    if model.get('_dsh_runtime'):
+        data += ['runtime', model['_dsh_runtime']]
     if model.get('thinking_level', 'default') != 'default':
         data += ['thinking', model['thinking_level']]
     if preset:
@@ -181,6 +184,20 @@ def build_patch(model, kind, preset=None, subagent=False, child_config=None, rec
                    'llm-deepseek-account', 'tool-web', 'web-search-deepseek',
                    'tool-working-directory', 'tool-goal', 'tool-ralph'):
         rows.append({'id': plugin, 'disabled': True})
+    if model.get('provider') == 'dsh':
+        route, ident = dsh_runtime.native_target(model)
+        rows[0] = {'id': 'llm-pi-ai', 'disabled': True}
+        for row in rows[1:3]:
+            row['config'] = {'provider': route, 'model': ident}
+        plugin_id = 'llm-deepseek-account' if route == 'deepseek-account' else 'llm-deepseek'
+        selected = model.get('thinking_level', 'default')
+        for row in rows:
+            if row['id'] == plugin_id:
+                row.update(disabled=False, config={} if selected == 'default' else {'reasoningEffort': selected})
+                row['config']['maxTokens'] = model.get('max_output_tokens', 4096)
+                if model.get('_dsh_runtime', {}).get('context_window'):
+                    row['config']['modelOverrides'] = {ident: {'contextWindow': model['max_input_tokens']}}
+        rows.append(dsh_runtime.credential_patch())
     # Nested delegation stays disabled unless a measured per-model grant (or the
     # explicit controlled probe) exists.  The gate lives in
     # executor_adapter/model_capabilities; this function only renders the
@@ -208,6 +225,9 @@ def build_patch(model, kind, preset=None, subagent=False, child_config=None, rec
                 if plugin.get('id') == record_protection.PLUGIN_ID:
                     plugin['config']['access_mode'] = access
         rows += mounted
+    rows += dsh_runtime.compaction_patch(model)
+    rows.append({'id': 'skill-filesystem', 'config': {
+        'dshHome': os.environ.get('DSH_HOME') or str(Path.home() / '.dsh'), 'watch': False}})
     return rows
 
 
@@ -416,7 +436,7 @@ def _prepare_dsh(run, state, model, relay):
                                      child_config=subagent_runtime.child_config(model))
     else:
         preset = base_preset
-    patch = build_patch({**model, 'api_base': relay.url}, state['kind'], preset, subagent=allowed_subagent,
+    patch = build_patch({**model, 'api_base': relay.url if relay else ''}, state['kind'], preset, subagent=allowed_subagent,
                         record_root=project, access=access)
     patch[3]['config']['workspaceRoot'] = str(project)
     patch_path = HERE / 'dsh-home/worker-patches' / (current_fingerprint + '.yml')
@@ -443,7 +463,8 @@ def _prepare_dsh(run, state, model, relay):
     job = {**info, 'desktop_executable': info.get('executable', str(EXECUTABLE)),
            'executable': str(NODE) if independent else launch_executable,
            'cli': str(Path(launch_executable).resolve()) if independent else '',
-           'access_mode': access, 'task_id': state['id'], 'kind': state['kind'], 'model': model['model'],
+           'access_mode': access, 'task_id': state['id'], 'kind': state['kind'],
+           'provider': dsh_runtime.native_target(model)[0], 'model': dsh_runtime.native_target(model)[1],
            'cwd': str(project), 'patch': str(patch_path), 'state_dir': str(RUNTIME / 'state'),
            'session_key': session_key, 'prompt_file': str(agent_prompt),
            'cancel_file': str(run / 'cancelled.flag'), 'timeout': state['timeout'],
@@ -453,7 +474,7 @@ def _prepare_dsh(run, state, model, relay):
            'subagent_ledger': str(ledger) if ledger else None}
     registry.write_json(run / 'dsh-job.json', job)
     env = {k: v for k, v in os.environ.items() if not any(s in k.upper() for s in ('API_KEY', 'TOKEN', 'SECRET'))}
-    env.update({'DSH_HOME': str(HERE / 'dsh-home'), 'DSH_WORKER_API_KEY': relay.token,
+    env.update({'DSH_HOME': str(HERE / 'dsh-home'), 'DSH_WORKER_API_KEY': relay.token if relay else '',
                 'MODEL_DESK_PRESET_PROOF': str(run / 'preset-proof.json'),
                 'MODEL_DESK_RECORD_PROOF': str(run / record_protection.PROOF_NAME),
                 'DSH_TELEMETRY_MODE': 'DISABLED', 'PYTHONIOENCODING': 'utf-8'})
@@ -492,7 +513,9 @@ def _run_task(run, state, model, relay):
     project, before = prepared['project'], prepared['before']
     preset, allowed_subagent, process = prepared['preset'], prepared['allowed_subagent'], prepared['process']
     key = model.get('api_key', '')
-    redact = lambda text: (str(text).replace(key, '[已隐藏]') if key else str(text)).replace(relay.token, '[已隐藏]')
+    def redact(text):
+        value = str(text).replace(key, '[已隐藏]') if key else str(text)
+        return value.replace(relay.token, '[已隐藏]') if relay else value
     events = queue.Queue()
     def reader(stream, channel):
         for line in stream:
@@ -716,6 +739,19 @@ def run_task(run, state, model):
     execution_leases.validate_task(state, model)
     import execution_endpoints
     execution_endpoints.gate(state.get('engine') or 'dsh', model, workflow_settings.snapshot())
+    model = dsh_runtime.apply(model, state.get('cli_runtime'))
+    if model.get('provider') == 'dsh':
+        settings = workflow_settings.snapshot()
+        if (not settings.get('paid_allowed') or settings.get('enforce_paid_budget', True)
+                or settings.get('enforce_model_call_limit', True)):
+            raise ValueError('DSH 原生账户费用与内部调用次数未知，需要付费授权并关闭无法保证的硬上限')
+        model_scope.check(settings.get('model_scope', model_scope.DEFAULT_SCOPE), True)
+        if state.get('route', {}).get('mode') == 'auto' and not settings['enabled']:
+            raise ValueError('协作总开关已关闭，自动派发未启动')
+        registry.patch_task(run, billing_source='dsh-native-account', cost_unknown_calls=1,
+                            cost_settled_cny=None, cost_status='unknown',
+                            thinking_selected_level=model.get('thinking_level', 'default'))
+        return _run_task(run, state, model, None)
     # One per-task thinking-metadata resolution.  A degraded engine default must
     # not kill an otherwise eligible task, but an exact model mismatch and an
     # explicitly chosen level without trusted metadata still stop before any

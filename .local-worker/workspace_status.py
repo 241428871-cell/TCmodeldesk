@@ -52,7 +52,10 @@ def snapshot(store: Store, models: list[dict], tasks: list[dict], defaults: Runt
                 blocked = ('' if endpoint_enabled else '执行端尚未启用')
             except ValueError as error:
                 runtime_ready, endpoint_enabled, blocked = False, False, str(error)
-            ready = bool(model and model.get('enabled', True) and runtime_ready and endpoint_enabled)
+            ready = bool(model and model.get('enabled', True) and model.get('account_enabled', True)
+                         and runtime_ready and endpoint_enabled)
+            if model and model.get('account_enabled') is False:
+                blocked = '此模型引用的账户已停用'
             activity = brain_activity.get(binding['model_id'], {}) if binding['role'] == 'decision' else {}
             count = (int(activity.get('running', 0)) if binding['role'] == 'decision' else
                      sum(t.get('project') == saved['path'] and t.get('model_id') == binding['model_id']

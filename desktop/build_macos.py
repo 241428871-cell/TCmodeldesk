@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import os
+import platform
 import plistlib
 import shutil
 import subprocess
@@ -67,6 +68,8 @@ def copy_source(destination: Path) -> None:
     for path in (ROOT / 'docs').glob('*.md'):
         if path.name not in local_only:
             shutil.copy2(path, docs / path.name)
+    import desktop_sources
+    desktop_sources.stamp(destination)
 
 
 def main() -> None:
@@ -95,8 +98,8 @@ def main() -> None:
     copy_notices(resources)
     info = {'CFBundleIdentifier': 'local.tcmodeldesk.desktop', 'CFBundleName': 'TCmodeldesk',
         'CFBundleDisplayName': 'TCmodeldesk', 'CFBundleExecutable': 'TCmodeldesk',
-        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.1',
-        'CFBundleVersion': '2', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
+        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.6',
+        'CFBundleVersion': '7', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
         'CFBundleIconFile': 'TCmodeldesk',
         'NSPrincipalClass': 'NSApplication', 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}
     with (contents / 'Info.plist').open('wb') as handle:
@@ -104,6 +107,7 @@ def main() -> None:
     environment = dict(os.environ)
     environment['CLANG_MODULE_CACHE_PATH'] = str(build / 'clang-cache')
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-parse-as-library', '-O',
+        '-target', f'{platform.machine()}-apple-macosx13.0',
         '-module-cache-path', str(build / 'swift-cache'), '-framework', 'AppKit', '-framework', 'WebKit',
         str(ROOT / 'desktop/macos/TCmodeldesk.swift'), '-o', str(contents / 'MacOS/TCmodeldesk')],
         cwd=ROOT, env=environment, timeout=120, check=True)

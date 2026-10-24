@@ -8,7 +8,7 @@ from typing import ClassVar, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-MAX_LIMIT: Final = 8
+MAX_LIMIT: Final = 64
 POLL_SECONDS: Final = 0.25
 
 
@@ -38,6 +38,8 @@ class LeaseRequest(BaseModel):
     exclusive: bool = False
     project_limit: int = Field(default=1, ge=1, le=MAX_LIMIT)
     account_limit: int = Field(default=1, ge=1, le=MAX_LIMIT)
+    model: str = Field(default="", max_length=1024)
+    model_limit: int = Field(default=MAX_LIMIT, ge=1, le=MAX_LIMIT)
 
 
 class LeaseState(BaseModel):
@@ -86,6 +88,8 @@ def blocking_reason(
         return "项目并发已满"
     if sum(1 for item in active if item.account == request.account) >= request.account_limit:
         return "账户并发已满"
+    if request.model and sum(item.model == request.model for item in active) >= request.model_limit:
+        return "模型并行实例已满"
     for other in [*active, *reserved]:
         path = conflicting_path(request, other)
         if path:

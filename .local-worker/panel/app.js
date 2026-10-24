@@ -399,7 +399,7 @@ function changeProjectView(view){
   markPanelActivity();startAutoPoll();
 }
 window.addEventListener('modeldesk-project-context',event=>changeProjectView(event.detail));
-const engineNames={workbuddy:'WorkBuddy',dsh:'DeepSeek Harness',pi:'Pi Agent',claude_cli:'Claude CLI',codex_cli:'Codex CLI',direct:'直接调用',aider:'Aider'};
+const engineNames={workbuddy:'WorkBuddy',dsh:'DeepSeek Harness',pi:'Pi Agent',claude_cli:'Claude CLI',codex_cli:'Codex CLI',dsh:'DSH CLI',direct:'直接调用',aider:'Aider'};
 const defaultAgent=()=>state.workflow?.execution_agent||'dsh';
 const registeredAgents=()=>state.execution_agents||{dsh:{name:'DeepSeek Harness'},pi:{name:'Pi Agent'}};
 const agentIds=()=>Object.keys(registeredAgents());
@@ -666,7 +666,7 @@ function renderExecutionActivity(){
   const running=activity?.running??tasks.filter(t=>t.status==='running').length;
   setMarkup(box,`<strong>全局执行：${running} 个运行中 · ${total-running} 个排队/派发中</strong>`+
     '<span>模型占用全局共享；其他项目的任务明细需选择“全部项目”查看。</span>'+
-    tasks.map(task=>`<div class="activity-job"><span>${escapeText(task.model_name||'执行模型')} · ${escapeText(task.title||task.id)}</span><button type="button" class="text-button" data-activity-project="${escapeText(task.project)}" ${task.project?'':'disabled'}>查看项目：${escapeText(task.project||'未记录目录')}</button></div>`).join('')+
+    tasks.map(task=>`<div class="activity-job"><span>${escapeText(task.model_name||'执行模型')} · ${escapeText(task.title||task.id)}</span><button type="button" class="text-button" data-activity-project="${escapeText(task.project)}" title="${escapeText(task.project||'未记录目录')}" ${task.project?'':'disabled'}>查看项目：${escapeText(task.project?task.project.split(/[\\/]/).filter(Boolean).pop()||task.project:'未记录目录')}</button></div>`).join('')+
     (activity?.complete===false?'<span>部分任务状态暂时无法读取，以上为已确认状态。</span>':''));
 }
 
@@ -717,7 +717,7 @@ function hostAccountPresentation(account){
   if(status==='updating')message='正在读取 DSH 官方登录账户余额…';
   else if(status==='signed-out')message='DSH 当前未登录，未显示余额。';
   else if(status==='expired')message=value.message||'账户状态已过期，请重新同步。';
-  else if(status==='unavailable')message='余额暂不可用，请确认 DSH 已登录并启用工作台插件。';
+  else if(status==='unavailable')message='尚未读取 DSH 登录账户；可在账户面板通过 DSH CLI 主动读取。';
   else if(status==='error')message='DSH 账户余额读取失败；未显示旧余额。';
   else if(status==='ready')message=rows.length?'':'官方接口已返回，但没有钱包金额。';
   else message='DSH 账户余额未知。';
@@ -729,7 +729,7 @@ function hostAccountPresentation(account){
     error:typeof value.error==='string'?value.error:'',
     stale,
     sourceText:'来源：DSH 官方登录账户 · 与执行模型 API 账户分开',
-    refreshNote:'更新显示只读取最近同步的余额；账户约每 2 分钟自动同步。',
+    refreshNote:'可从 DSH CLI 主动读取官方账户；已连接的宿主插件也可同步快照。',
   };
 }
 function renderHostAccount(){
@@ -1142,7 +1142,7 @@ function renderDetail() {
   const thinking=thinkingInfo(state.models.find(m=>m.id===task.model_id),task);
   setMarkup($('task-detail'),`<div class="detail-head"><div><h3>${escapeText(task.title)}</h3><p>${escapeText(task.model_name)} · ${escapeText(engineNames[task.engine]||'历史执行器')} · ${task.kind==='chat'?'咨询 / 分析':'修改项目文件'} · ${clock(task.started_at||task.created_at)}</p></div>${active?`<button class="button secondary" id="stop-task">停止任务</button>`:pendingRecovery?`<button class="button primary" id="recover-task" ${recoveringTaskKey===resourceKey(task)?'disabled':''}>${fileRecovery?'恢复文件写回':'恢复执行'}（需确认）</button>`:hasAgentSession(task)?'<button class="button secondary" id="continue-task">继续会话</button>':badge(taskDisplayStatus(task),independentlyAccepted?'已完成':undefined)}</div>
     <div class="detail-body"><div class="phase-track">${phases.map((phase,i)=>`${i?'<span class="phase-arrow">→</span>':''}<span class="phase-item ${i<phaseIndex?'done':i===phaseIndex?'current':''}">${escapeText(phase)}</span>`).join('')}</div>
-    <div class="detail-facts"><div><span class="label">当前状态</span><span class="value">${escapeText(displayPhase)} · ${escapeText(duration(task))}</span></div>${writebackTag(task)?`<div><span class="label">文件写回</span><span class="value">${writebackTag(task)}${task.writeback_state==='conflict'&&task.writeback_conflicts?.length?`<small class="field-hint">${escapeText(task.writeback_conflicts.slice(0,4).join('、'))}${task.writeback_conflicts.length>4?' 等':''}；冲突文件不会覆盖你的修改。</small>`:''}</span></div>`:''}<div><span class="label">${task.kind==='chat'?'Token 用量':'项目文件夹'}</span><span class="value">${task.kind==='chat'?(usage?.total_tokens?`${usage.total_tokens.toLocaleString()} tokens${task.cost_unknown_calls>0?`（另有 ${task.cost_unknown_calls} 次未返回用量，未知；不是全目标总量）`:''}`:'服务端尚未返回用量'):escapeText(task.project||'—')}</span></div></div>
+    <div class="detail-facts"><div><span class="label">当前状态</span><span class="value">${escapeText(displayPhase)} · ${escapeText(duration(task))}</span></div>${writebackTag(task)?`<div><span class="label">文件写回</span><span class="value">${writebackTag(task)}${task.writeback_state==='conflict'&&task.writeback_conflicts?.length?`<small class="field-hint">${escapeText(task.writeback_conflicts.slice(0,4).join('、'))}${task.writeback_conflicts.length>4?' 等':''}；冲突文件不会覆盖你的修改。</small>`:''}</span></div>`:''}<div><span class="label">${task.kind==='chat'?'Token 用量':'项目文件夹'}</span><span class="value">${task.kind==='chat'?(usage?.total_tokens?`${usage.total_tokens.toLocaleString()} tokens${task.cost_unknown_calls>0?`（另有 ${task.cost_unknown_calls} 次未返回用量，未知；不是全目标总量）`:''}`:'服务端尚未返回用量'):`<span class="path-value" title="${escapeText(task.project||'')}">${escapeText(task.project?'…/'+task.project.split(/[\\/]/).filter(Boolean).slice(-2).join('/'):'—')}</span>`}</span></div></div>
     ${task.completion_wait?`<p class="session-note" role="status">${escapeText(completionWaitText(task))}</p>`:''}
     ${independentlyAccepted&&task.status==='recovery_pending'?'<p class="session-note">原执行器曾中断，历史记录予以保留；本任务已由主脑接管完成并通过独立验收，无需恢复原执行。</p>':''}
     ${pendingRecovery?`<section class="route-note recovery-note" aria-label="待恢复"><strong>待恢复 · 不会自动重发</strong>${task.recovery?.reason?`<p>原因：${escapeText(task.recovery.reason)}</p>`:''}<p class="field-hint">${fileRecovery?'恢复将核对并写回已保存的候选文件，不重新调用模型或运行测试。租约未静止、文件冲突或回执不完整时会拒绝；仍需独立验收。':'执行是否完成、工具副作用与实际费用都未知；核对后可用同一个任务记录恢复执行，不创建新记录，也不会自动验收。'}</p></section>`:''}
@@ -1261,12 +1261,11 @@ async function refreshState() {
 let modelSavedConnectionDraft='';
 function modelConnectionDraft(body){const {default_agent,...connection}=body;return JSON.stringify(connection);}
 function cliModelForm(){
-  const provider=$('model-provider').value,cli=provider==='claude_cli'||provider==='codex_cli';
-  $('model-base').closest('label').hidden=cli;$('model-base').required=!cli;
-  $('model-key').closest('label').hidden=cli;$('key-hint').hidden=cli;
-  $('discover-models').hidden=false;$('model-thinking-level').closest('label').hidden=cli;
-  $('model-thinking-note').hidden=cli;$('model-bypass').closest('label').hidden=cli;
-  $('model-clear-key').closest('label').hidden=cli;
+  const provider=$('model-provider').value,cli=['claude_cli','codex_cli','dsh'].includes(provider);
+  $('model-base').closest('label').hidden=true;$('model-base').required=false;$('model-account-field').hidden=cli;$('model-account').required=!cli;
+  const connectionHint=$('model-connection-hint');if(connectionHint)connectionHint.textContent=cli?'此模型使用本机 CLI 的登录账户，工作台不保存密钥。保存后可用“读取列表”核对原生模型目录；不会发送生成请求。':'API 模型使用所选账户的接口与密钥。思考和压缩等运行参数在项目模型的“运行设置”中配置。';
+  $('discover-models').hidden=false;$('model-thinking-level').closest('label').hidden=true;
+  $('model-thinking-note').hidden=true;$('model-bypass').closest('label').hidden=true;
   $('model-price-input').closest('details').hidden=cli;
   $('model-default-agent').closest('label').hidden=cli;
   $('model-default-agent-hint').hidden=cli;
@@ -1276,7 +1275,7 @@ function cliModelForm(){
 function openModel(id=null, endpoint=null) {
   if(state.models.find(m=>m.id===id)?.provider==='workbuddy'){openEndpointDialog('workbuddy');setEndpointTab('models');return;}
   $('model-form').reset();$('model-error').textContent='';$('discovered-models').innerHTML='';$('model-id').value=id||'';
-  const model=state.models.find(m=>m.id===id);$('model-dialog-title').textContent=model?'编辑模型连接':'添加模型连接';
+  const model=state.models.find(m=>m.id===id);$('model-dialog-title').textContent=model?'编辑模型':'添加模型';
   $('model-name').value=model?.name||'';$('model-provider').value=model?.provider||'local';$('model-base').value=model?.api_base||'';$('model-code').value=model?.model||'';
   $('model-input').value=model?.max_input_tokens||32768;$('model-output').value=model?.max_output_tokens||4096;$('model-enabled').checked=model?.enabled??true;$('model-bypass').checked=model?.bypass_proxy??true;$('model-default').checked=!!id&&id===state.default_model;
   const preference=modelAgentPreference(model);$('model-default-agent').value=MODEL_AGENT_VALUES.includes(preference)?preference:MODEL_AGENT_FOLLOW;
@@ -1286,9 +1285,9 @@ function openModel(id=null, endpoint=null) {
   renderThinkingSetting(model||{provider:$('model-provider').value,api_base:$('model-base').value});
   renderSubagentCapability(model||null);
   $('model-price-input').value=model?.pricing_cny?.cache_miss_input??'';$('model-price-cache').value=model?.pricing_cny?.cache_hit_input??'';$('model-price-output').value=model?.pricing_cny?.output??'';
-  $('key-hint').textContent=model?.api_key_set?'已有密钥。留空保持原密钥；输入新值可替换。':'';$('clear-key-label').hidden=!model?.api_key_set;
   if(endpoint&&!model){$('model-default-agent').value=endpoint;}
   if(endpoint&&endpoint.endsWith('_cli')&&!model){$('model-provider').value=endpoint;$('model-default-agent').value=endpoint;$('model-input').value=200000;$('model-output').value=32000;}
+  window.modelDeskAccounts?.sync(model?.account_id||(model?'legacy-'+model.id:''));
   cliModelForm();
   modelSavedConnectionDraft=modelConnectionDraft(modelBody());
   $('model-dialog').showModal();
@@ -1299,9 +1298,9 @@ function modelBody() {
     model:$('model-code').value.trim(),enabled:$('model-enabled').checked,
     make_default:$('model-default').checked,default_agent:$('model-provider').value,
     max_input_tokens:Number($('model-input').value),max_output_tokens:Number($('model-output').value)};
-  return {name:$('model-name').value.trim(),provider:$('model-provider').value,api_base:$('model-base').value.trim(),model:$('model-code').value.trim(),api_key:$('model-key').value,
-    clear_key:$('model-clear-key').checked,api_key_env:state.models.find(m=>m.id===id)?.api_key_env||'',max_input_tokens:Number($('model-input').value),max_output_tokens:Number($('model-output').value),enabled:$('model-enabled').checked,bypass_proxy:$('model-bypass').checked,make_default:$('model-default').checked,default_agent:$('model-default-agent').value,
-    thinking_level:$('model-thinking-level').value,
+  return {name:$('model-name').value.trim(),provider:$('model-provider').value,api_base:$('model-base').value.trim(),model:$('model-code').value.trim(),account_id:$('model-account').value,
+    max_input_tokens:Number($('model-input').value),max_output_tokens:Number($('model-output').value),enabled:$('model-enabled').checked,bypass_proxy:$('model-bypass').checked,make_default:$('model-default').checked,default_agent:$('model-default-agent').value,
+    thinking_level:state.models.find(m=>m.id===id)?.thinking_level||'default',
     pricing_cny:['model-price-input','model-price-cache','model-price-output'].every(key=>$(key).value==='')?null:{cache_miss_input:$('model-price-input').value===''?null:Number($('model-price-input').value),cache_hit_input:$('model-price-cache').value===''?null:Number($('model-price-cache').value),output:$('model-price-output').value===''?null:Number($('model-price-output').value)}};
 }
 function renderThinkingSetting(model,selected=null){
@@ -1493,9 +1492,10 @@ $('usage-refresh').onclick=async()=>{
   const button=$('usage-refresh');button.disabled=true;
   try{
     if(isDshHost){
+      await api('/api/accounts/refresh',{provider:'dsh'});
       state.host_account=await api('/api/host-account',undefined);
       renderUsage();
-      toast('已更新显示；账户余额约每 2 分钟自动同步。');
+      toast('已从 DSH CLI 读取官方账户余额。');
     }else{
       state.codex_usage=await api('/api/codex-usage/refresh',{});
       renderUsage();
@@ -1530,7 +1530,8 @@ $('model-provider').onchange=()=>{
   const provider=$('model-provider').value;
   const bases={local:'http://localhost:1234/v1',deepseek:'https://api.deepseek.com',glm:'https://open.bigmodel.cn/api/paas/v4',custom:''};
   $('model-base').value=bases[provider];$('model-code').value='';$('model-bypass').checked=provider==='local';
-  if(['claude_cli','codex_cli'].includes(provider)){$('model-input').value=200000;$('model-output').value=32000;}
+  if(['claude_cli','codex_cli','dsh'].includes(provider)){$('model-input').value=200000;$('model-output').value=32000;}
+  window.modelDeskAccounts?.sync();
   cliModelForm();
   renderThinkingSetting({provider,api_base:$('model-base').value});
 };
@@ -1544,7 +1545,7 @@ $('model-form').onsubmit=async event=>{event.preventDefault();const button=event
   const saved=await api(id?`/api/models/${encodeURIComponent(id)}/save`:'/api/models',payload);const assignment=window.modelDeskWorkspace?.takeEditorAssignment?.();$('model-dialog').close();toast('模型连接已保存');await refresh();await window.modelDeskWorkspace?.afterModelSave?.(saved,assignment);
 }catch(error){$('model-error').textContent=error.message;}finally{button.disabled=false;}};
 $('discover-models').onclick=async()=>{const button=$('discover-models');button.disabled=true;button.textContent='读取中…';$('model-error').textContent='';try{
-  const cli=['claude_cli','codex_cli'].includes($('model-provider').value);
+  const cli=['claude_cli','codex_cli','dsh'].includes($('model-provider').value);
   const data=cli?await window.modelDeskWorkspace.discover($('model-provider').value):await api('/api/discover',{...modelBody(),id:$('model-id').value});
   const rows=data.models.map(model=>typeof model==='string'?{id:model,name:model}:model);
   $('discovered-models').innerHTML=rows.map(model=>`<option value="${escapeText(model.id)}">${escapeText(model.name||model.id)}</option>`).join('');

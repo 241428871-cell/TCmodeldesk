@@ -9,6 +9,8 @@
 .local-worker/settings.json
 .local-worker/workflow.json
 .local-worker/workspace.json
+.local-worker/project-defaults.json
+.local-worker/collaboration-policy.json
 .local-worker/engineering-policy.json
 .local-worker/execution-endpoints.json
 .local-worker/workbuddy.json

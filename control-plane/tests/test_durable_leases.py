@@ -217,3 +217,28 @@ def test_failed_release_transaction_keeps_resources(tmp_path: Path) -> None:
         connection.rollback()
         # Then the previous hold is still authoritative on disk.
         assert leases.read(connection, old.token) == old
+
+
+def test_model_instance_cap_and_other_model_parallelism(database: Connection) -> None:
+    first = leases.reserve(
+        database, request("first", files=(), model="model_a", model_limit=1), holder()
+    )
+    assert first is not None
+    same = leases.reserve(
+        database, request("same", files=(), model="model_a", model_limit=8), holder()
+    )
+    other = leases.reserve(
+        database, request("other", files=(), model="model_b", model_limit=8), holder()
+    )
+    assert same is None
+    assert other is not None
+
+
+def test_legacy_receipt_without_model_fields_can_transition(database: Connection) -> None:
+    original = reserved(database)
+    raw = original.model_dump_json(exclude={"request": {"model", "model_limit"}})
+    _ = database.execute(
+        "UPDATE resource_leases SET data=? WHERE token=?", (raw, original.token)
+    )
+    armed = leases.arm(database, original)
+    assert armed.phase == LeasePhase.ARMED

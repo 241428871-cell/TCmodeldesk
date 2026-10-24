@@ -71,7 +71,7 @@ class RouteTests(unittest.TestCase):
         for path in ("/api/state", "/api/workflow", "/api/codex-usage", "/api/session",
                      "/api/tasks/task-1", "/api/tasks/task_1/log"):
             self.assertEqual(desk.validate_request(path, "GET"), path)
-        for path in ("/api/workflow", "/api/codex-usage/refresh", "/api/route-preview", "/api/models",
+        for path in ("/api/workspace/defaults", "/api/workflow", "/api/codex-usage/refresh", "/api/route-preview", "/api/models",
                      "/api/discover", "/api/tasks", "/api/models/m1/save", "/api/models/m1/delete",
                      "/api/models/m1/test", "/api/models/m1/default", "/api/models/m1/balance",
                      "/api/models/m1/thinking", "/api/tasks/t1/cancel"):

@@ -108,6 +108,8 @@ def validate_model(engine, model):
     if model is None:
         return
     provider = model.get('provider')
+    if provider == 'dsh' and engine != 'dsh':
+        raise ValueError('DSH 原生目录模型只能由 DSH CLI 执行')
     for native in ('workbuddy', 'claude_cli', 'codex_cli'):
         if (engine == native) != (provider == native):
             raise ValueError(LABELS[native] + ' 仅执行其原生账户模型；不能与其他执行端互换')

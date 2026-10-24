@@ -122,11 +122,11 @@ def test_only_edits_lease_files_and_unlisted_edits_lease_the_project(fixture: Le
     assert (chat.files, chat.exclusive) == ((), False)
 
 
-def test_project_limit_defaults_to_one_and_is_bounded(fixture: LeaseFixture) -> None:
-    assert workspace_config.work_concurrency(str(fixture.project)) == 1
+def test_project_limit_defaults_to_eight_and_is_bounded(fixture: LeaseFixture) -> None:
+    assert workspace_config.work_concurrency(str(fixture.project)) == 8
     fixture.concurrency(3)
     assert workspace_config.work_concurrency(str(fixture.project)) == 3
-    for bad in (0, 5, True):
+    for bad in (0, 65, True):
         with pytest.raises(workspace_config.WorkspaceError):
             _ = workspace_config.update_project(
                 {
@@ -176,9 +176,10 @@ def trial(monkeypatch: pytest.MonkeyPatch) -> tuple[tuple[str, ...], int]:
     return snapshot, peak
 
 
-def test_default_runs_workers_one_at_a_time(
+def test_explicit_serial_project_runs_workers_one_at_a_time(
     fixture: LeaseFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    fixture.concurrency(1)
     _ = fixture.task("t1")
     _ = fixture.task("t2", ("b.py",))
     snapshot, peak = trial(monkeypatch)
@@ -206,6 +207,7 @@ def test_raised_limit_respects_write_conflicts(
 def test_cancelled_waiter_releases_without_launching(
     fixture: LeaseFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    fixture.concurrency(1)
     first = fixture.task("t1")
     second = fixture.task("t2", ("b.py",))
     request = execution_leases.request_for(registry.read_task(first), MODEL)
@@ -234,3 +236,13 @@ def test_cancelled_waiter_releases_without_launching(
     finally:
         execution_leases.release(request.owner)
         worker.join(3)
+
+
+def test_same_model_and_account_can_run_independent_instances(
+    fixture: LeaseFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture.concurrency(8)
+    _ = fixture.task("t1", ("a.py",))
+    _ = fixture.task("t2", ("b.py",))
+    snapshot, peak = trial(monkeypatch)
+    assert len(snapshot) == 2 and peak == 2

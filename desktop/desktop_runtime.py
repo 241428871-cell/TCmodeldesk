@@ -16,7 +16,7 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 from uuid import uuid4
 
 import psutil
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DesktopError(ValueError):
@@ -38,6 +38,12 @@ class Connection(BaseModel):
     pid: int
     birth: float
     managed: bool
+
+
+class RuntimeRecord(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra='ignore', strict=True)
+    url: str
+    pid: int = Field(gt=0)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -93,6 +99,11 @@ def initialize(template: Path, destination: Path) -> Path:
     if install.exists():
         if not (install / '.local-worker/panel_server.py').is_file():
             raise DesktopError('数据目录中的安装不完整；不会覆盖已有数据')
+        import desktop_sources
+        try:
+            desktop_sources.synchronize(template, install, lambda: _idle_for_upgrade(install))
+        except (desktop_sources.SourceUpdateError, OSError, ValueError) as error:
+            raise DesktopError('内置代码升级未完成，保留现有数据；请重试。' + str(error)) from None
         return install
     destination.mkdir(parents=True, exist_ok=True)
     staging = destination / ('.installation-' + uuid4().hex)
@@ -103,6 +114,23 @@ def initialize(template: Path, destination: Path) -> Path:
         if staging.exists():
             shutil.rmtree(staging)
     return install
+
+
+def _idle_for_upgrade(installation: Path) -> None:
+    runtime = installation / '.local-worker/panel-runtime.json'
+    if not runtime.exists():
+        return
+    record = RuntimeRecord.model_validate_json(runtime.read_bytes())
+    from urllib.parse import urlparse
+    address = urlparse(record.url)
+    if (address.scheme != 'http' or address.hostname != '127.0.0.1' or not address.port
+            or address.username or address.password or address.path or address.query or address.fragment):
+        raise DesktopError('旧后台地址无法核对，暂不升级')
+    connection = probe(record.url, installation)
+    if connection is not None:
+        stop(connection)
+    elif psutil.pid_exists(record.pid):
+        raise DesktopError('旧后台仍存在且身份无法确认，暂不升级')
 
 
 def probe(url: str, expected: Path) -> Connection | None:

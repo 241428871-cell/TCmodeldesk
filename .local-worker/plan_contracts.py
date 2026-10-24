@@ -1,9 +1,16 @@
 """Typed request boundaries for AI plans and explicit human decisions."""
 from __future__ import annotations
 
-from typing import Final, Literal, NewType, Self, TypedDict
+from typing import ClassVar, Final, Literal, NewType, Self, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    field_validator,
+    model_validator,
+)
 
 GoalId = NewType('GoalId', str)
 StageId = NewType('StageId', str)
@@ -15,19 +22,25 @@ class PlanError(ValueError):
     """A plan or decision violates one named governance constraint."""
 
     def __init__(self, code: str, detail: str) -> None:
-        self.code = code
-        self.detail = detail
+        self.code: str = code
+        self.detail: str = detail
         super().__init__(detail)
 
 
 class Boundary(BaseModel):
     """Reject unknown fields rather than silently accepting changed authority."""
 
-    model_config = ConfigDict(frozen=True, extra='forbid', strict=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra='forbid', strict=True)
+
+
+class GoalInput(Boundary):
+    title: str = Field(default='', max_length=200)
+    objective: str = Field(default='', max_length=20000)
 
 
 class GoalContract(Boundary):
-    criteria: list[str] = Field(min_length=1, max_length=40)
+    criteria: list[str] = Field(default_factory=list, max_length=40)
+    brief_input: GoalInput | None = None
     review_policy: Literal['exceptions', 'final'] = 'exceptions'
     allowed_files: list[str] | None = None
     file_scope: Literal['project', 'selected'] | None = None
@@ -47,6 +60,16 @@ class GoalContract(Boundary):
         if self.file_scope == 'project' and self.allowed_files:
             raise PlanError('file_scope', '项目范围不使用固定文件清单；如需限制文件请选择指定范围')
         return self
+
+
+class PlanBrief(GoalInput):
+    criteria: list[str] = Field(default_factory=list, max_length=40)
+    obligations: list[str] = Field(default_factory=list, max_length=40)
+
+    @field_validator('criteria', 'obligations')
+    @classmethod
+    def bounded_items(cls, values: list[str]) -> list[str]:
+        return GoalContract.clean_criteria(values)
 
 
 class StageSpec(Boundary):
@@ -84,6 +107,7 @@ class PlanPatch(Boundary):
     reason: str = Field(min_length=1, max_length=2000)
     stages: list[StageSpec] = Field(min_length=1, max_length=MAX_STAGES)
     authority_epoch: int | None = Field(default=None, ge=0)
+    brief: PlanBrief | None = None
 
 
 class DecisionRequest(Boundary):
@@ -139,3 +163,6 @@ class PlanView(TypedDict):
     history: list[dict[str, JsonValue]]
     stages: list[dict[str, JsonValue]]
     final_review: FinalReview
+    brief_input: dict[str, JsonValue]
+    brief: dict[str, JsonValue] | None
+    completion_pending: list[str]

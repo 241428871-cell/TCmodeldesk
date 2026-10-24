@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TCmodeldesk">
+  <defs><linearGradient id="bg" x1="0.3" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#334578"/><stop offset="1" stop-color="#0f1426"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14.5" fill="url(#bg)"/>
+  <path d="M32 18 17 45M32 18l15 27" stroke="#8cabff" stroke-opacity=".85" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+  <path d="M17 45h30" stroke="#8cabff" stroke-opacity=".35" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <circle cx="32" cy="18" r="8.5" fill="#fff"/><circle cx="17" cy="45" r="7" fill="#5fd1b0"/><circle cx="47" cy="45" r="7" fill="#ffb554"/>
+</svg>

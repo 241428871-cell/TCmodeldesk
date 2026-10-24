@@ -116,10 +116,11 @@ def update(endpoint, body, settings, *, idle_guard=None):
                 raise ValueError('所选执行端未安装或路径不可用；未改变当前选择')
             old['endpoints'][endpoint]['cli_source'] = body['cli_source']
             registry.write_json(Path(registry.HERE) / CONFIG_NAME, {'schema': 1, 'endpoints': old['endpoints']})
-        if endpoint == 'codex_cli':
+        if endpoint in ('codex_cli', 'dsh'):
             import provider_accounts
-            import codex_usage
             provider_accounts.invalidate(endpoint)
+        if endpoint == 'codex_cli':
+            import codex_usage
             codex_usage.CACHE = codex_usage.UsageCache()
         return {'ok': True, 'endpoint': endpoint, **old['endpoints'][endpoint]}
     if endpoint in ('pi', 'dsh') and isinstance(body, dict) and set(body) == {'access_mode'}:

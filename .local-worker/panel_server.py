@@ -830,6 +830,12 @@ def safe_error(exc, key=""):
 
 def probe_model(model_id):
     model = registry.get_model(model_id, require_enabled=False)
+    if model.get('provider') == 'dsh':
+        import provider_accounts
+        catalog = provider_accounts.catalog('dsh')
+        ok = any(row['id'] == model['model'] for row in catalog.get('models', []))
+        return {'ok': ok, 'kind': 'reachability', 'at': registry.now(),
+                'message': 'DSH 原生模型目录可读取；未调用模型生成' if ok else catalog.get('message', 'DSH 未返回此模型')}
     if model.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli'}:
         raise ValueError('原生账户不使用 API 连接测试；请检查对应 CLI 登录状态')
     # The normal UI action is deliberately interface-only.  A connection check
@@ -859,6 +865,8 @@ def reachability_check(model, timeout=REACHABILITY_TIMEOUT):
     can never be read as a successful generation or a measured capability.  Only
     the safe exception category and HTTP status are recorded, never a body.
     """
+    if model.get('provider') == 'dsh':
+        return probe_model(model['id'])
     if model.get('provider') in {'claude_cli', 'codex_cli'}:
         import cli_worker
         info = cli_worker.availability(model['provider'])
@@ -943,7 +951,10 @@ def scope_gate(model, settings, task_id=None, engine=None):
 
 
 def discover(body):
-    if body.get("id") and not body.get("api_base"):
+    if body.get('account_id'):
+        import connection_accounts
+        model = connection_accounts.connection(str(body['account_id']), secret=True)
+    elif body.get("id") and not body.get("api_base"):
         model = registry.get_model(body["id"], require_enabled=False)
         if model.get('provider') == 'workbuddy':
             raise ValueError('WorkBuddy 原生模型固定为 DeepSeek V4.1 Flash，不调用 API 模型列表')
@@ -1348,6 +1359,8 @@ def submit_task(body, trusted=None, authority=None, request_id='', *, goal_effec
     # Use that exact engine for every following capability/project check.
     engine = route['engine']
     model = registry.get_model(route['model_id'])
+    import collaboration_policy
+    prompt += collaboration_policy.task_hint(str(body.get('project') or ''), model['id'])
     if engine not in execution_engines.ENGINES or (engine == 'direct' and kind != 'chat') or (engine == 'aider' and kind != 'edit'):
         raise ValueError('执行器与任务类型不匹配')
     if engine in execution_engines.AGENTS and not execution_engines.availability(engine)['ready']:
@@ -1452,7 +1465,8 @@ def submit_task(body, trusted=None, authority=None, request_id='', *, goal_effec
     workspace_binding = (None if link_parent else workspace_config.dispatch_binding(
         project, model['id'], str(body.get('binding_id') or '')))
     cli_runtime = (link_parent.get('cli_runtime') if link_parent else
-                   {key: workspace_binding[key] for key in workspace_config.defaults()} if workspace_binding else None)
+                   {key: workspace_binding[key] for key in workspace_config.Runtime.__annotations__
+                    if key in workspace_binding} if workspace_binding else None)
     workspace_binding_id = (link_parent.get('workspace_binding_id') if link_parent else
                             workspace_binding['id'] if workspace_binding else None)
     import endpoint_access
@@ -2481,12 +2495,21 @@ class Handler(BaseHTTPRequestHandler):
                 import provider_accounts
                 data = workspace_config.snapshot(public_tasks())
                 data['accounts'] = {provider: provider_accounts.account_snapshot(provider)
-                                    for provider in ('claude_cli', 'codex_cli', 'deepseek')}
+                                    for provider in ('claude_cli', 'codex_cli', 'deepseek', 'dsh')}
+                import connection_accounts
+                data['api_accounts'] = connection_accounts.listing()
+                import collaboration_policy
+                data['collaboration'] = collaboration_policy.snapshot()
                 data['model_accounts'] = {row['id']: provider_accounts.account_snapshot('deepseek', row['id'])
                                           for row in registry.list_models()['models'] if row.get('provider') == 'deepseek'}
                 data['catalogs'] = {provider: provider_accounts.catalog_snapshot(provider)
-                                    for provider in ('codex_cli', 'claude_cli')}
+                                    for provider in ('codex_cli', 'claude_cli', 'dsh')}
                 return self.send_json(data)
+            if path == '/api/connection-accounts':
+                import connection_accounts
+                import account_metadata
+                return self.send_json({'accounts': [{**row, 'balance': account_metadata.balance(row['id'])}
+                    for row in connection_accounts.listing()]})
             if path == '/api/task-records':
                 return self.send_json(task_history.listing(self.project_view))
             if path == '/api/db/space':
@@ -2592,6 +2615,7 @@ class Handler(BaseHTTPRequestHandler):
                                            "error": "任务记录暂时不可读，请重试"}, 503)
                 return self.send_json({"task": public_task_cost(row), "prompt": prompt.read_text(encoding="utf-8") if prompt.exists() else ""})
             assets = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css",
+                      "/accounts.js": "accounts.js", "/collaboration.js": "collaboration.js",
                       "/workspace.js": "workspace.js", "/workspace.css": "workspace.css",
                       "/governance.js": "governance.js", "/governance.css": "governance.css",
                       "/reconciliation.js": "reconciliation.js", "/reconciliation.css": "reconciliation.css",
@@ -2600,6 +2624,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": "页面不存在"}, 404)
             raw = (WEB / assets[path]).read_bytes()
             mime = {"/": "text/html", "/app.js": "text/javascript", "/style.css": "text/css",
+                    "/accounts.js": "text/javascript", "/collaboration.js": "text/javascript",
                     "/workspace.js": "text/javascript", "/workspace.css": "text/css",
                     "/governance.js": "text/javascript", "/governance.css": "text/css",
                     "/reconciliation.js": "text/javascript", "/reconciliation.css": "text/css",
@@ -2640,12 +2665,30 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/workspace/bindings':
                 workspace_config.update_binding(body)
                 return self.send_json(workspace_config.snapshot(public_tasks()))
+            if path == '/api/workspace/defaults':
+                import project_defaults
+                if set(body) != {'project'}:
+                    raise ValueError('保存默认模板只接受来源项目')
+                return self.send_json(project_defaults.capture(body['project']))
             if path == '/api/provider-catalog':
                 import provider_accounts
                 return self.send_json(provider_accounts.catalog(body.get('provider')))
             if path == '/api/accounts/refresh':
                 import provider_accounts
                 return self.send_json(provider_accounts.account_snapshot(body.get('provider'), body.get('model_id', ''), force=True))
+            if path == '/api/connection-accounts':
+                import connection_accounts
+                return self.send_json(connection_accounts.upsert(body), 201)
+            if path == '/api/connection-accounts/delete':
+                import connection_accounts
+                connection_accounts.delete(body.get('id', ''))
+                return self.send_json({'ok': True})
+            if path == '/api/connection-accounts/balance':
+                import account_metadata
+                return self.send_json(account_metadata.balance(str(body.get('id') or ''), force=True))
+            if path == '/api/collaboration-policy':
+                import collaboration_policy
+                return self.send_json(collaboration_policy.save(body))
             update_match = re.fullmatch(r'/api/cli-updates/(dsh|claude_cli|codex_cli)/(check|update)', path)
             if update_match:
                 import cli_updates

@@ -4,18 +4,18 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from typing import Protocol, TypedDict
-from pydantic import JsonValue
 
 import continuation_clock
 import dynamic_plan
 import engineering_policy
-import human_decisions
+import goal_file_scope
 import goal_interactions
 import goal_requirements
+import human_decisions
 import project_views
 import stage_store
-import goal_file_scope
 from plan_contracts import PlanError
+from pydantic import JsonValue
 
 
 class GovernanceError(ValueError):
@@ -120,17 +120,20 @@ def post(path: str, body: dict, view: dict, panel: Panel) -> dict | None:
             request_id=str(body.get('request_id') or ''),
         )
     if path == '/api/governance/goals':
-        from plan_contracts import GoalContract
-        contract = GoalContract.model_validate({key: body[key] for key in (
-            'criteria', 'review_policy', 'allowed_files', 'file_scope') if key in body})
+        from plan_contracts import GoalContract, GoalInput
         title = str(body.get('title') or '').strip()
         objective = str(body.get('objective') or '').strip()
-        if not title or not objective:
-            raise GovernanceError('请填写目标名称和目标内容')
+        if not title and not objective and not body.get('criteria'):
+            raise GovernanceError('请至少填写目标名称、期望结果或验收准则中的一项，其余由主脑补充')
+        supplied = GoalInput(title=title, objective=objective)
+        contract = GoalContract.model_validate({
+            **{key: body[key] for key in ('criteria', 'review_policy', 'allowed_files', 'file_scope') if key in body},
+            'brief_input': supplied})
         interval = body.get('interval_seconds', 1800)
         if not isinstance(interval, int) or isinstance(interval, bool) or not 60 <= interval <= 604800:
             raise GovernanceError('续跑周期应为 1 分钟到 7 天')
-        goal = stage_store.create_goal(title, objective, project, actor='human', store='project')
+        display_title = title or (objective or contract.criteria[0]).splitlines()[0][:200]
+        goal = stage_store.create_goal(display_title, objective, project, actor='human', store='project')
         dynamic_plan.configure_goal(project, goal['id'], contract, actor='human')
         continuation_clock.configure_clock(project, goal['id'], interval_seconds=interval,
                                             enabled=False, obligations=body.get('obligations') or [])

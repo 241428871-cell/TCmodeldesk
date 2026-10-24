@@ -8,7 +8,7 @@ STYLES: Final = frozenset(
     {"style.css", "workspace.css", "governance.css", "reconciliation.css", "flow.css"}
 )
 SCRIPTS: Final = frozenset(
-    {"app.js", "workspace.js", "reconciliation.js", "governance.js", "flow.js"}
+    {"app.js", "accounts.js", "collaboration.js", "workspace.js", "reconciliation.js", "governance.js", "flow.js"}
 )
 STYLE: Final = re.compile(r'<link\s+rel="stylesheet"\s+href="/([^"<>]+)"\s*>')
 SCRIPT: Final = re.compile(r'<script\s+src="/([^"<>]+)"\s*>\s*</script>')

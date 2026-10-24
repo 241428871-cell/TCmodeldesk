@@ -218,6 +218,9 @@ def capability_models():
         data = read_registry()
     rows = []
     for row in data.get("models", []):
+        if row.get('account_id'):
+            import connection_accounts
+            row = {**row, **connection_accounts.connection(row['account_id'])}
         rows.append({
             "id": row.get("id"),
             "name": row.get("name"),
@@ -246,6 +249,9 @@ def current_capability_identity(row):
 def public_model(row):
     import model_agent_defaults
     row = normalize_row(dict(row))
+    if row.get('account_id'):
+        import connection_accounts
+        row.update(connection_accounts.connection(row['account_id']))
     public = {k: v for k, v in row.items() if k not in {"secret", "api_key", "subagent"}}
     public["api_key_set"] = bool(row.get("secret") or os.environ.get(row.get("api_key_env", "")))
     try:
@@ -275,10 +281,14 @@ def get_model(model_id=None, require_enabled=True):
         raise ValueError("请选择一个已配置的执行模型")
     if require_enabled and not row.get("enabled", True):
         raise ValueError("这个模型已停用")
-    if row.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli'}:
+    if row.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli', 'dsh'}:
         if row.get('secret') or row.get('api_key_env'):
             raise ValueError('原生账户模型不能保存 API 密钥')
         row['api_key'] = ''
+        return row
+    if row.get('account_id'):
+        import connection_accounts
+        row.update(connection_accounts.connection(row['account_id'], secret=True))
         return row
     row["api_key"] = protect(row["secret"], True) if row.get("secret") else os.environ.get(row.get("api_key_env", ""), "")
     return row
@@ -287,8 +297,14 @@ def get_model(model_id=None, require_enabled=True):
 def upsert_model(body, model_id=None):
     if body.get('provider') == 'workbuddy':
         return upsert_native_model(body, model_id)
-    if body.get('provider') in {'claude_cli', 'codex_cli'}:
+    if body.get('provider') in {'claude_cli', 'codex_cli', 'dsh'}:
         return upsert_cli_model(body, model_id)
+    account_id = str(body.get('account_id') or '')
+    if account_id:
+        import connection_accounts
+        if any(body.get(key) for key in ('api_key', 'clear_key', 'api_key_env')):
+            raise ValueError('请在账户管理中修改密钥，模型只引用账户')
+        body = {**body, **connection_accounts.connection(account_id)}
     name = str(body.get("name", "")).strip()
     api_base = str(body.get("api_base", "")).strip().rstrip("/")
     model = str(body.get("model", "")).strip()
@@ -316,7 +332,7 @@ def upsert_model(body, model_id=None):
         previous = next((m for m in data["models"] if m["id"] == model_id), None)
         if model_id and previous is None:
             raise ValueError("模型不存在")
-        if previous and previous.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli'}:
+        if previous and previous.get('provider') in {'workbuddy', 'claude_cli', 'codex_cli', 'dsh'}:
             raise ValueError('原生账户模型不能转换为 API 模型；请另行添加连接')
         model_id = model_id or uuid4().hex[:12]
         secret = previous.get("secret", "") if previous else ""
@@ -387,6 +403,9 @@ def upsert_model(body, model_id=None):
                'thinking_level': thinking_level, 'thinking_info': thinking_info,
                'model_version': str(body.get('model_version', previous.get('model_version', '') if previous else '')).strip()[:120],
                'subagent': subagent_block}
+        if account_id:
+            connection_accounts.adopt(data, account_id)
+            row.update(account_id=account_id, secret='', api_key_env='')
         data["models"] = [row if m["id"] == model_id else m for m in data["models"]] if previous else data["models"] + [row]
         if body.get("make_default"):
             if not row["enabled"]:
@@ -447,6 +466,9 @@ def upsert_cli_model(body, model_id=None):
         raise ValueError('CLI 账户模型不能包含 API 密钥、接口地址、价格或其他执行端')
     name = str(body.get('name') or '').strip()
     model = str(body.get('model') or '').strip()
+    if provider == 'dsh':
+        import dsh_runtime
+        dsh_runtime.native_target({'provider': provider, 'model': model})
     if not 1 <= len(name) <= 100 or not 1 <= len(model) <= 200 or type(body.get('enabled', True)) is not bool:
         raise ValueError('请填写 CLI 模型名称、模型 ID 和有效启用状态')
     tags = body.get('preferred_tasks', [])
@@ -458,7 +480,7 @@ def upsert_cli_model(body, model_id=None):
     if complexity not in {'simple', 'medium', 'complex'}:
         raise ValueError('CLI 模型复杂度上限无效')
     limits = {}
-    for field, default, maximum in (('max_input_tokens', 32768, 1048576), ('max_output_tokens', 4096, 131072)):
+    for field, default, maximum in (('max_input_tokens', 32768, 2000000), ('max_output_tokens', 4096, 131072)):
         value = body.get(field, default)
         if type(value) is not int or not 64 <= value <= maximum:
             raise ValueError('CLI Token 容量需要是有效正整数')

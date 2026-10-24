@@ -9,14 +9,19 @@ import continuation_clock
 import delegation_policy
 import dynamic_plan
 import goal_effects
-from controller_errors import DispatchRefused, ReviewRefused
-from governance_context import DispatchBlocked
-from goal_brain_contract import BrainError, Record
-from goal_deliveries import accepted_handover, recovered_dispatch, recovered_handover, rework_request
 import human_decisions
 import model_registry as registry
 import stage_store
 import task_graph_bridge
+from controller_errors import DispatchRefused, ReviewRefused
+from goal_brain_contract import BrainError, Record
+from goal_deliveries import (
+    accepted_handover,
+    recovered_dispatch,
+    recovered_handover,
+    rework_request,
+)
+from governance_context import DispatchBlocked
 from plan_contracts import DecisionRequest, PlanPatch
 from plan_validation import FIELDS
 
@@ -163,7 +168,8 @@ def apply(project: str, goal_id: str, epoch: int, actions: Record, panel: Panel,
     dispatched = []
     patch = (PlanPatch.model_validate({**actions['plan'], 'authority_epoch': epoch})
              if actions['plan'] is not None else None)
-    plan_effect = goal_effects.prepare(scope, 'plan', 'goal_plan', patch.model_dump()) if patch else None
+    plan_effect = goal_effects.prepare(scope, 'plan', 'goal_plan',
+        patch.model_dump(exclude={'brief'} if patch.brief is None else set())) if patch else None
     with _action_guard(project, goal_id, epoch, scope):
         if scope is not None:
             active = continuation_clock.snapshot(project, goal_id).get('active_intent') or {}
