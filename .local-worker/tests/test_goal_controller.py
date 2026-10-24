@@ -1,13 +1,13 @@
 """Native planning lifecycle tests; all providers and generation are mocked."""
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import sqlite3
-from pathlib import Path
 import sys
 import tempfile
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -128,6 +128,34 @@ class GoalControllerTests(unittest.TestCase):
             phases = conn.execute('SELECT step,status FROM goal_graph_steps ORDER BY step').fetchall()
         self.assertEqual(phases, [('actions', 'done'), ('native', 'done'), ('settle', 'done'), ('snapshot', 'done')])
         self.assertTrue((self.project / '.model-desk/langgraph/checkpoints.sqlite').is_file())
+
+    def test_partial_goal_is_completed_in_both_native_brain_execution_paths(self):
+        import governance_api
+        for provider in ('codex_cli', 'claude_cli'):
+            with self.subTest(provider=provider):
+                model = registry.upsert_model({'provider': provider, 'name': provider, 'model': 'fixture-brief'})
+                workspace_config.update_binding({'project': self.project_text, 'model_id': model['id'],
+                    'role': 'decision', 'effort': 'high'})
+                created = governance_api.post('/api/governance/goals', {'objective': 'Export a portable report'},
+                    {'mode': 'project', 'project': self.project_text}, self.panel)
+                goal_id = created['goal']['id']
+                clock.configure_clock(self.project_text, goal_id, brain_model_id=model['id'])
+                clock.control(self.project_text, goal_id, 'start')
+                actions = self.actions()
+                actions['plan']['brief'] = {'title': 'Portable report', 'objective': '',
+                    'criteria': ['Report opens offline'], 'obligations': ['Archive verification evidence']}
+                actions = goal_brain_contract.parse_actions(json.dumps(actions))
+                with patch.object(runner, 'run', side_effect=self.fake_run(actions)) as invoke:
+                    finished = controller.run_once(self.project_text, goal_id, self.panel)
+                self.assertEqual(invoke.call_args.args[1], provider)
+                self.assertIn('title', invoke.call_args.args[0]['contract']['completion_pending'])
+                plan = dynamic_plan.describe_goal(self.project_text, goal_id)
+                self.assertEqual(plan['completion_pending'], [])
+                self.assertEqual(plan['brief']['criteria'], ['Report opens offline'])
+                self.assertEqual(stage_store.get_goal(goal_id, self.project_text)['title'], 'Portable report')
+                self.assertEqual(finished['interval_seconds'], 1800)
+                self.assertEqual(finished['obligations'][0]['status'], 'pending')
+                self.panel.dispatch_stage.assert_not_called()
 
     def test_control_cannot_inject_unverified_session_from_another_project(self):
         with patch.object(runner, 'run') as invoke, self.assertRaises(goal_brain_contract.BrainError):

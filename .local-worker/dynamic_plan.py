@@ -5,20 +5,20 @@ atomically in the owning project's existing records database.
 """
 from __future__ import annotations
 
-from contextlib import nullcontext
 import json
 import sqlite3
+from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
-from pydantic import JsonValue
-
-import stage_store
 import continuation_store
-import goal_file_scope
+import goal_brief
 import goal_effects
-from plan_contracts import GoalContract, PlanError, PlanPatch, PlanView
+import goal_file_scope
 import plan_records as records
+import stage_store
+from plan_contracts import GoalContract, PlanError, PlanPatch, PlanView
 from plan_validation import decode_stages, normalize
+from pydantic import JsonValue
 
 if TYPE_CHECKING:
     from model_desk_control.host_effects import EffectRequest
@@ -55,6 +55,8 @@ def configure_goal(project: str, goal_id: str, payload: GoalContract | dict[str,
             'review_policy' not in parsed.model_fields_set else parsed.review_policy)
         value = {**parsed.model_dump(exclude={'base_revision'}), 'allowed_files': allowed,
                  'file_scope': scope, 'review_policy': review_policy}
+        if 'brief_input' not in parsed.model_fields_set:
+            value['brief_input'] = previous.get('brief_input')
         conn.execute('INSERT INTO goal_contracts VALUES(?,?,?,?) '
                      'ON CONFLICT(goal_id) DO UPDATE SET revision=excluded.revision, '
                      'payload=excluded.payload,updated_at=excluded.updated_at',
@@ -83,6 +85,7 @@ def describe_goal(project: str, goal_id: str) -> PlanView:
                 'file_scope': contract['file_scope'],
                 'plan_revision': records.revision(conn, goal_id),
                 'contract_revision': contract['revision'], 'history': history, 'stages': stages,
+                **goal_brief.describe(conn, goal_id, contract),
                 'final_review': human_decisions.final_gate_in_connection(conn, project, goal_id)}
 
 
@@ -93,7 +96,8 @@ def revise_plan(project: str, goal_id: str, payload: PlanPatch | dict[str, JsonV
         raise PlanError('brain_only', '任务拆分与阶段修订应由主脑提交')
     parsed = PlanPatch.model_validate(payload)
     project = records.owner(project, goal_id)
-    goal_effects.verify(effect, project, goal_id, 'goal_plan', parsed.model_dump())
+    patch_value = parsed.model_dump(exclude={'brief'} if parsed.brief is None else set())
+    goal_effects.verify(effect, project, goal_id, 'goal_plan', patch_value)
     import continuation_clock
     authority = continuation_clock.authority_lock(project, goal_id, parsed.authority_epoch) if parsed.authority_epoch is not None else nullcontext()
     created: list[str] = []
@@ -108,7 +112,7 @@ def revise_plan(project: str, goal_id: str, payload: PlanPatch | dict[str, JsonV
             created = [row['id'] for row in conn.execute('SELECT id FROM stages WHERE goal_id=?', (goal_id,))]
         else:
             contract = records.contract(conn, goal_id)
-            if not contract['criteria']:
+            if contract['revision'] == 0:
                 raise PlanError('criteria_missing', '请人类先固定验收准则，再由 AI 拆分阶段')
             state = records.authority(project, goal_id, conn)
             if state['stopped']:
@@ -124,11 +128,14 @@ def revise_plan(project: str, goal_id: str, payload: PlanPatch | dict[str, JsonV
             existing = decode_stages(conn.execute('SELECT * FROM stages WHERE goal_id=?', (goal_id,)).fetchall())
             normalized = normalize(parsed.stages, existing, contract['allowed_files'], revision + 1,
                 project=project, file_scope=contract['file_scope'])
+            completed_brief = goal_brief.apply(conn, project, goal_id, contract, parsed.brief)
+            if completed_brief is not None:
+                patch_value['brief'] = completed_brief.model_dump()
             _write_plan(conn, project, goal_id, normalized['stages'], existing, normalized['superseded'], revision + 1)
             changes = {key: value for key, value in normalized.items() if key != 'stages'}
             changes['stage_ids'] = [row['id'] for row in normalized['stages']]
             conn.execute('INSERT INTO plan_revisions VALUES(?,?,?,?,?,?,?)',
-                         (goal_id, revision + 1, parsed.reason, actor, records.dump(parsed.model_dump()),
+                         (goal_id, revision + 1, parsed.reason, actor, records.dump(patch_value),
                           records.dump(changes), records.now()))
             records.log(conn, goal_id, 'plan_revision', actor,
                         records.dump({'revision': revision + 1, 'reason': parsed.reason, **changes}))

@@ -3,16 +3,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import PurePosixPath
 import sqlite3
-from typing import Literal, TypedDict
-
-from pydantic import JsonValue
+from pathlib import PurePosixPath
+from typing import Literal, NotRequired, TypedDict
 
 import model_registry as registry
 import project_storage
 import stage_store
 from plan_contracts import PlanError
+from pydantic import JsonValue
 
 
 class ContractRecord(TypedDict):
@@ -21,6 +20,7 @@ class ContractRecord(TypedDict):
     allowed_files: list[str]
     file_scope: Literal['project', 'selected']
     revision: int
+    brief_input: NotRequired[dict[str, JsonValue] | None]
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -112,8 +112,8 @@ def clean_files(values: list[str]) -> list[str]:
 def authority(project: str, goal_id: str, conn: sqlite3.Connection | None = None) -> dict[str, JsonValue]:
     """Bind proposals to the continuation authority; optional clock stays passive."""
     import continuation_clock
-    import engineering_policy
     import continuation_store
+    import engineering_policy
     state = (continuation_store.read(conn, goal_id) or {'authority_epoch': 0, 'user_intent': 'RUN'}) if conn is not None else continuation_clock.snapshot(project, goal_id)
     policy = engineering_policy.policy_snapshot(project)
     return {'authority_epoch': int(state['authority_epoch']),

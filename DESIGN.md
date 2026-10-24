@@ -1,5 +1,7 @@
 # Model Desk design system
 
+Goal entry accepts any meaningful title, result or acceptance criterion. Optional labels state that the brain fills missing content on the first explicit planning run; saving remains offline. The existing goal details show AI additions separately from human criteria, including a pending state. File scope, review policy and cadence retain their explicit defaults. Reuse the current form, details, inline-error and status primitives; add no tokens, layout system or motion.
+
 New-project defaults reuse the project Settings form primitives and a labelled save button with a live status message. Saved templates affect future projects only; unsaved drafts block capture with a visible error. The status names the model count and concurrency. No new visual tokens or modal are introduced.
 
 ## 1. Atmosphere & Identity
