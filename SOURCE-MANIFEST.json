@@ -546,8 +546,8 @@
     },
     {
       "path": ".local-worker/panel/app.js",
-      "sha256": "3a63209e9ca00fbaeb683f613d59d1a0fe8a248d00cc2ec0c13a6edac9343a41",
-      "bytes": 183041
+      "sha256": "f4f8aaa8d7372e0de0e0639fd7b3889f2a13eee94d289c5fa7eca9e9e439ad72",
+      "bytes": 183038
     },
     {
       "path": ".local-worker/panel/codex-bridge.js",
@@ -576,8 +576,8 @@
     },
     {
       "path": ".local-worker/panel/index.html",
-      "sha256": "6cdc9f12ae937449b834c1eae0d6ddd6d065c96db34dbb581d6ce4d8bec044e1",
-      "bytes": 50919
+      "sha256": "66fdaf2933463ff70573fdd4f4f4130dbf9762ba33f522d0b981786760622da8",
+      "bytes": 50916
     },
     {
       "path": ".local-worker/panel/reconciliation.css",
@@ -616,8 +616,8 @@
     },
     {
       "path": ".local-worker/panel_server.py",
-      "sha256": "763840525a3682e8a8aa3a3c6929c74596476085bb79c6ba8572d5d67a7b1bb0",
-      "bytes": 167314
+      "sha256": "b3964b0458b9d977f5d1f4153ce5a4c5b7e5a3c1ca3e10f019d4250200c8bf70",
+      "bytes": 167315
     },
     {
       "path": ".local-worker/panel_service.py",
@@ -1661,8 +1661,8 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "afcbacb1881db6f76a9c9388321880ae1499a994c9ba13809fb2ace0a279a1cd",
-      "bytes": 15105
+      "sha256": "6a220d1a4c002779cead7667d89f2836de0d368d32e62655b95feb2c166e472a",
+      "bytes": 15617
     },
     {
       "path": "LICENSE",
@@ -1671,13 +1671,13 @@
     },
     {
       "path": "README.md",
-      "sha256": "774681b06fce16019e16f39a3069445477587a60ef1dc68e0315b104672fc7b0",
-      "bytes": 13668
+      "sha256": "b7149417ec92738115c6618e07b8912a5eb7d885b797aedbf1467f3e009f8266",
+      "bytes": 14036
     },
     {
       "path": "THIRD_PARTY.md",
-      "sha256": "f605386cec7962a36698aeb36cad7d2d20388347cf5fa77edce3c18781091b86",
-      "bytes": 1822
+      "sha256": "017481c1681679a4783a92b141172cf47abf2653de31dc3d7c70666d87a02d1e",
+      "bytes": 2168
     },
     {
       "path": "control-plane/README.md",
@@ -2311,18 +2311,23 @@
     },
     {
       "path": "desktop/backend_entry.py",
-      "sha256": "989535891b1ea894cb3f52861af50cda1af85632a7af298702c6fa85483337f9",
-      "bytes": 1466
+      "sha256": "8a803b3dd76ccf486bfda56054d22484b39315e67acbe0765416d9bee8ad0466",
+      "bytes": 1465
     },
     {
       "path": "desktop/build_macos.py",
-      "sha256": "58831d84989223b2e1f1d84a1ae620f3351f20afd749ed4ba48f79ebe031bcac",
-      "bytes": 6225
+      "sha256": "0dffd2a776bdf7e02e017000ac0c5cbeede4697806e6f049e38a130a614c471f",
+      "bytes": 6236
     },
     {
       "path": "desktop/desktop_runtime.py",
-      "sha256": "9d582687abe423bd6b5e4b6275969fc246b51b1795eb90ee792d101654cccd67",
-      "bytes": 13292
+      "sha256": "0ec45c175d85fbbfa0cdfd48199affa968d5fd55f6ebcaab812c9b0fe4eccc7f",
+      "bytes": 12636
+    },
+    {
+      "path": "desktop/desktop_server.py",
+      "sha256": "8ea4887b671b5d38770f5e22eb559af03de1f9d73009d0a383b03bf5d6a8ba11",
+      "bytes": 2069
     },
     {
       "path": "desktop/macos/Icon.swift",
@@ -2330,19 +2335,19 @@
       "bytes": 1409
     },
     {
-      "path": "desktop/macos/TCworkdesk.swift",
-      "sha256": "982ffffb71875db9577ae40364da92ede85e11c4262563b95a525c42b2982e4d",
-      "bytes": 13932
+      "path": "desktop/macos/TCmodeldesk.swift",
+      "sha256": "7b844df5cc4a0d881889480efe3454f85d0d99d3490d398ddb5768fd59f1a992",
+      "bytes": 17966
     },
     {
       "path": "desktop/package_dmg.py",
-      "sha256": "8a82f013ff86b31219a7c5bd721463174595aec9cdeb08b1b569b3ecee7b3217",
-      "bytes": 2128
+      "sha256": "4a093f0e84d9d45387c5936c4b1420211436b45fbcd68ba0bb4f83369003c298",
+      "bytes": 2134
     },
     {
       "path": "desktop/pyrightconfig.json",
-      "sha256": "aa75f84dea861bde1297baff25ec9c5007d503874975cfcd547fa06c13edb3cd",
-      "bytes": 183
+      "sha256": "4b2c8935ee66fcc51a2fd420b4214fe69a7551ca745f29ae3a429fae840d4d7a",
+      "bytes": 204
     },
     {
       "path": "desktop/requirements-build.txt",
@@ -2351,8 +2356,8 @@
     },
     {
       "path": "desktop/tests/test_desktop_runtime.py",
-      "sha256": "6c215ecaa05dca193f2dced2842cc0a147d7dd7c993affab4289d0fe0d744760",
-      "bytes": 4272
+      "sha256": "abe6ef65c7d53a36818a8311fcaa888366de4284a97e4af06fdce145452f5c78",
+      "bytes": 6651
     },
     {
       "path": "docs/AGENT_INSTALL.md",
@@ -2361,8 +2366,13 @@
     },
     {
       "path": "docs/CROSS_HOST_FEATURES.md",
-      "sha256": "3c034ff7fc7e9477d74139b4e5a455f5f4033d7d8ba6b23cbe5c9e08bc27bc7c",
-      "bytes": 35255
+      "sha256": "4a91956208abf19a691704df873f808334634392ad6db594cab9fbc996a0f61b",
+      "bytes": 35406
+    },
+    {
+      "path": "docs/Claude界面润色.md",
+      "sha256": "7f2e375e8e9bd338a981aecdb290b500e6a6e54a248d3ed787cb9ea2249b720d",
+      "bytes": 6258
     },
     {
       "path": "docs/DSH_BRAIN_PLUGIN.md",
@@ -2431,8 +2441,8 @@
     },
     {
       "path": "docs/macOS应用.md",
-      "sha256": "d7ae1b91409e45e8a2ef4a7bfdb8d673c18d3849a428dfb5b65f9d933dc46bb8",
-      "bytes": 5174
+      "sha256": "52868f6d7f20b556d38490560268bffb34754766d6249a8b72833c4754199f78",
+      "bytes": 6566
     },
     {
       "path": "docs/写回恢复协议.md",
@@ -2481,8 +2491,8 @@
     },
     {
       "path": "docs/重构进度.md",
-      "sha256": "b2ce788573bd0f7ff1d513362ce3fb1153d3c2705f500082e3ffb64a12b3ec88",
-      "bytes": 177124
+      "sha256": "6b59d47349347c1bf25d912945557a1c3b7f8d12554ace387c6dbb31e7d6f1c4",
+      "bytes": 178849
     },
     {
       "path": "environment.yml",

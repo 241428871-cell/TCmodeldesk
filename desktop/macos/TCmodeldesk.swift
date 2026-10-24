@@ -1,23 +1,35 @@
 import AppKit
 import WebKit
 
-struct BackendConnection: Decodable, Sendable {
+struct BackendConnection: Codable, Sendable {
     let workspace: String
     let url: String
     let managed: Bool
+    let product: String
+    let protocolVersion: Int
+    let pid: Int
+    let birth: Double
+    enum CodingKeys: String, CodingKey {
+        case workspace, url, managed, product, pid, birth
+        case protocolVersion = "protocol"
+    }
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
     private var window: NSWindow!
     private var webView: WKWebView!
     private var status: NSTextField!
     private var spinner: NSProgressIndicator!
     private var connection: BackendConnection?
     private var workspace: URL?
+    private var ownsConnection: Bool { connection?.managed == true && workspace == nil }
     private var working = false
+    private var quitting = false
+    private var statusItem: NSStatusItem!
+    private let serviceState = NSMenuItem(title: "正在连接工作台…", action: nil, keyEquivalent: "")
     private var preferences = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("TCworkdesk/desktop.json")
+        .appendingPathComponent("TCmodeldesk/desktop.json")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = ProcessInfo.processInfo.arguments
@@ -29,14 +41,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         } else if let saved = UserDefaults.standard.string(forKey: "ExternalWorkspace") {
             workspace = URL(fileURLWithPath: saved)
         }
+        if !UserDefaults.standard.bool(forKey: "LegacySettingsImported") {
+            if workspace == nil,
+               let legacy = UserDefaults.standard.persistentDomain(forName: "local.tcworkdesk.desktop")?["ExternalWorkspace"] as? String {
+                workspace = URL(fileURLWithPath: legacy)
+                UserDefaults.standard.set(legacy, forKey: "ExternalWorkspace")
+            }
+            UserDefaults.standard.set(true, forKey: "LegacySettingsImported")
+        }
         buildMenu()
+        buildStatusItem()
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1360, height: 900),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "TCworkdesk"
+        window.title = "TCmodeldesk"
         window.minSize = NSSize(width: 760, height: 540)
-        window.setFrameAutosaveName("TCworkdesk.MainWindow")
+        window.setFrameAutosaveName("TCmodeldesk.MainWindow")
         window.center()
         window.isReleasedWhenClosed = false
+        window.delegate = self
         let content = NSView()
         webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
         webView.navigationDelegate = self
@@ -69,19 +91,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         start()
     }
 
+    private func buildStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up",
+            accessibilityDescription: "TCmodeldesk 工作台")
+        statusItem.button?.image?.isTemplate = true
+        statusItem.button?.toolTip = "TCmodeldesk"
+        let menu = NSMenu()
+        menu.addItem(serviceState)
+        menu.addItem(.separator())
+        let show = menu.addItem(withTitle: "打开 TCmodeldesk", action: #selector(showWindow), keyEquivalent: "")
+        show.target = self
+        let settings = menu.addItem(withTitle: "数据位置与迁移…", action: #selector(dataSettings), keyEquivalent: "")
+        settings.target = self
+        menu.addItem(.separator())
+        let quit = menu.addItem(withTitle: "退出 TCmodeldesk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        quit.target = NSApp
+        statusItem.menu = menu
+    }
+
     private func buildMenu() {
         let bar = NSMenu()
         let app = NSMenuItem()
         bar.addItem(app)
         let menu = NSMenu()
-        menu.addItem(withTitle: "关于 TCworkdesk", action: #selector(about), keyEquivalent: "")
+        menu.addItem(withTitle: "关于 TCmodeldesk", action: #selector(about), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "数据位置与迁移…", action: #selector(dataSettings), keyEquivalent: ",")
         menu.addItem(withTitle: "连接已有工作台…", action: #selector(chooseWorkspace), keyEquivalent: "o")
         menu.addItem(withTitle: "使用应用独立工作台", action: #selector(useManagedWorkspace), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "隐藏 TCworkdesk", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        menu.addItem(withTitle: "退出 TCworkdesk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "隐藏 TCmodeldesk", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        menu.addItem(withTitle: "退出 TCmodeldesk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         app.submenu = menu
         let edit = NSMenuItem()
         edit.title = "编辑"
@@ -119,7 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             process.waitUntilExit()
             if process.terminationStatus != 0 {
                 let object = try? JSONSerialization.jsonObject(with: data) as? [String: String]
-                throw NSError(domain: "TCworkdesk", code: Int(process.terminationStatus),
+                throw NSError(domain: "TCmodeldesk", code: Int(process.terminationStatus),
                     userInfo: [NSLocalizedDescriptionKey: object?["error"] ?? "后台操作未完成，原数据已保留。"])
             }
             return try JSONDecoder().decode(BackendConnection.self, from: data)
@@ -129,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private func start(action: String = "connect", destination: URL? = nil) {
         guard !working else { return }
         working = true
+        serviceState.title = action == "migrate" ? "正在迁移数据…" : "正在连接工作台…"
         status.stringValue = action == "migrate" ? "正在校验并迁移数据，请勿退出…" : "正在连接工作台…"
         status.isHidden = false
         spinner.isHidden = false
@@ -148,10 +190,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
                 webView.load(URLRequest(url: url))
                 webView.isHidden = false
                 status.isHidden = true
-                window.subtitle = result.managed ? "独立工作台" : "已连接现有工作台"
+                window.subtitle = ownsConnection ? "独立工作台" : "已连接现有工作台"
+                serviceState.title = ownsConnection ? "独立工作台正在运行" : "已连接外部工作台 · 退出仅断开"
             } catch {
                 connection = nil
                 status.stringValue = "连接未完成，可从菜单重新连接。"
+                serviceState.title = "连接未完成 · 点击打开工作台处理"
                 showError(error.localizedDescription)
             }
         }
@@ -162,7 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let alert = NSAlert()
         alert.messageText = "数据位置"
         let path = connection.map { $0.managed ? URL(fileURLWithPath: $0.workspace).deletingLastPathComponent().path : $0.workspace } ?? "尚未连接"
-        alert.informativeText = "当前安装：\(path)\n\n默认在系统盘用户的 Library/Application Support/TCworkdesk/Data。迁移应用设置、模型配置、缓存及全局运行数据；项目源码与项目 .model-desk 历史随项目保留。系统钥匙串和第三方 CLI 账户不搬移。迁移后保留原目录作为备份。"
+        alert.informativeText = "当前安装：\(path)\n\n默认在系统盘用户的 Library/Application Support/TCmodeldesk/Data。迁移应用设置、模型配置、缓存及全局运行数据；项目源码与项目 .model-desk 历史随项目保留。系统钥匙串和第三方 CLI 账户不搬移。迁移后保留原目录作为备份。"
         alert.addButton(withTitle: "选择位置并迁移…")
         alert.addButton(withTitle: "在 Finder 中显示")
         alert.addButton(withTitle: "关闭")
@@ -178,39 +222,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
         let panel = NSOpenPanel()
         panel.title = "选择新数据目录的上级文件夹"
-        panel.message = "将在所选位置新建 TCworkdesk Data；不覆盖已有目录。请先暂停目标并结束任务。"
+        panel.message = "将在所选位置新建 TCmodeldesk Data；不覆盖已有目录。请先暂停目标并结束任务。"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let parent = panel.url {
-            start(action: "migrate", destination: parent.appendingPathComponent("TCworkdesk Data"))
+            start(action: "migrate", destination: parent.appendingPathComponent("TCmodeldesk Data"))
         }
     }
 
     @objc private func chooseWorkspace() {
         guard !working else { return }
         let panel = NSOpenPanel()
-        panel.title = "选择已有 TCworkdesk／AAD 安装目录"
+        panel.title = "选择已有 TCmodeldesk／AAD 安装目录"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         if panel.runModal() == .OK, let url = panel.url {
-            workspace = url
-            UserDefaults.standard.set(url.path, forKey: "ExternalWorkspace")
-            start()
+            switchWorkspace(to: url)
         }
     }
     @objc private func useManagedWorkspace() {
         guard !working else { return }
-        workspace = nil
-        UserDefaults.standard.removeObject(forKey: "ExternalWorkspace")
-        start()
+        switchWorkspace(to: nil)
+    }
+    private func stopOwnedBackend() async throws {
+        guard let connection, ownsConnection else { return }
+        let encoded = try JSONEncoder().encode(connection)
+        guard let value = String(data: encoded, encoding: .utf8) else { throw CocoaError(.coderInvalidValue) }
+        _ = try await runBackend(["stop", "--preferences", preferences.path, "--connection", value])
+    }
+    private func switchWorkspace(to destination: URL?) {
+        guard !working else { return }
+        working = true
+        Task {
+            do {
+                try await stopOwnedBackend()
+                connection = nil
+                workspace = destination
+                if let destination { UserDefaults.standard.set(destination.path, forKey: "ExternalWorkspace") }
+                else { UserDefaults.standard.removeObject(forKey: "ExternalWorkspace") }
+                working = false
+                start()
+            } catch {
+                working = false
+                showWindow()
+                showError(error.localizedDescription)
+            }
+        }
     }
     @objc private func reload() { if connection != nil { webView.reload() } else { start() } }
     @objc private func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     @objc private func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "TCworkdesk", .applicationVersion: "0.3.0",
-            .credits: NSAttributedString(string: "原生 macOS 窗口 · 本地多智能体工作台\n界面关闭不会中断后台任务。")])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "TCmodeldesk", .applicationVersion: "0.3.1",
+            .credits: NSAttributedString(string: "原生 macOS 窗口 · 本地多智能体工作台\n关闭窗口后保留程序坞和菜单栏入口；退出先检查运行任务。\n基于 Gambler134201/multi-agent-collaboration · MIT")])
     }
     private func showError(_ message: String) { let alert = NSAlert(); alert.messageText = "操作未完成"; alert.informativeText = message; alert.runModal() }
 
@@ -218,8 +283,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if working { showError("正在准备或迁移数据，请等待操作结束。"); return .terminateCancel }
-        // Window ownership is separate from execution ownership. Quitting never kills model work.
-        return .terminateNow
+        guard ownsConnection else { return .terminateNow }
+        guard !quitting else { return .terminateCancel }
+        quitting = true
+        serviceState.title = "正在检查任务并退出…"
+        Task {
+            do {
+                try await stopOwnedBackend()
+                NSStatusBar.system.removeStatusItem(statusItem)
+                NSApp.reply(toApplicationShouldTerminate: true)
+            } catch {
+                quitting = false
+                serviceState.title = "仍在运行 · 退出未完成"
+                NSApp.reply(toApplicationShouldTerminate: false)
+                showWindow()
+                showError(error.localizedDescription)
+            }
+        }
+        return .terminateLater
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
@@ -250,7 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 }
 
 @main
-struct TCworkdeskApp {
+struct TCmodeldeskApp {
     @MainActor static func main() {
         let application = NSApplication.shared
         let delegate = AppDelegate()

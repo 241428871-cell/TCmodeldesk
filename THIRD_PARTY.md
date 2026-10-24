@@ -1,5 +1,9 @@
 # 第三方依赖与外部应用
 
+## 原项目
+
+TCmodeldesk（原名 TCworkdesk）基于 [Gambler134201/multi-agent-collaboration](https://github.com/Gambler134201/multi-agent-collaboration) 重构。原源码采用 MIT，Copyright (c) 2026 Gambler134201；完整许可保留在 [LICENSE](LICENSE)。本仓库的后续重构、原生窗口与分发不代表上游官方发行。
+
 源码分发不附带运行环境、账户或记录。新增 macOS App 构建会单独打包 Python、Node 与后端依赖，并把安装分发中可取得的许可文本放在 `Contents/Resources/licenses`。不会打包 Codex、DSH、Claude、cswap、Pi、WorkBuddy 应用或这些应用的用户数据。
 
 ## 直接依赖

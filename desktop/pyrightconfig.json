@@ -1,6 +1,6 @@
 {
   "pythonVersion": "3.12",
   "extraPaths": ["..", "../.local-worker"],
-  "include": ["backend_entry.py", "desktop_runtime.py", "build_macos.py"],
+  "include": ["backend_entry.py", "desktop_runtime.py", "desktop_server.py", "build_macos.py"],
   "typeCheckingMode": "standard"
 }

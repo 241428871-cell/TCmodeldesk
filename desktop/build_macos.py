@@ -83,7 +83,7 @@ def main() -> None:
     if not args.reuse_backend:
         run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--distpath', str(build / 'frozen'),
              '--workpath', str(build / 'pyinstaller'), str(ROOT / 'desktop/TCBackend.spec')], timeout=600)
-    app = output / 'TCworkdesk.app'
+    app = output / 'TCmodeldesk.app'
     if app.exists():
         raise SystemExit('输出应用已存在；请选择新输出目录，不覆盖已有安装')
     contents = app / 'Contents'
@@ -93,11 +93,11 @@ def main() -> None:
     shutil.copytree(build / 'frozen/TCBackend', resources / 'backend', symlinks=True)
     copy_source(resources / 'workbench')
     copy_notices(resources)
-    info = {'CFBundleIdentifier': 'local.tcworkdesk.desktop', 'CFBundleName': 'TCworkdesk',
-        'CFBundleDisplayName': 'TCworkdesk', 'CFBundleExecutable': 'TCworkdesk',
-        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.0',
-        'CFBundleVersion': '1', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
-        'CFBundleIconFile': 'TCworkdesk',
+    info = {'CFBundleIdentifier': 'local.tcmodeldesk.desktop', 'CFBundleName': 'TCmodeldesk',
+        'CFBundleDisplayName': 'TCmodeldesk', 'CFBundleExecutable': 'TCmodeldesk',
+        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.1',
+        'CFBundleVersion': '2', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
+        'CFBundleIconFile': 'TCmodeldesk',
         'NSPrincipalClass': 'NSApplication', 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}
     with (contents / 'Info.plist').open('wb') as handle:
         plistlib.dump(info, handle)
@@ -105,14 +105,14 @@ def main() -> None:
     environment['CLANG_MODULE_CACHE_PATH'] = str(build / 'clang-cache')
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-parse-as-library', '-O',
         '-module-cache-path', str(build / 'swift-cache'), '-framework', 'AppKit', '-framework', 'WebKit',
-        str(ROOT / 'desktop/macos/TCworkdesk.swift'), '-o', str(contents / 'MacOS/TCworkdesk')],
+        str(ROOT / 'desktop/macos/TCmodeldesk.swift'), '-o', str(contents / 'MacOS/TCmodeldesk')],
         cwd=ROOT, env=environment, timeout=120, check=True)
     subprocess.run(['/usr/bin/xcrun', 'swiftc', '-module-cache-path', str(build / 'swift-cache'),
         str(ROOT / 'desktop/macos/Icon.swift'), '-o', str(build / 'make-icon')],
         cwd=ROOT, env=environment, timeout=60, check=True)
-    run([str(build / 'make-icon'), str(build / 'TCworkdesk.iconset')], timeout=15)
-    run(['/usr/bin/iconutil', '-c', 'icns', str(build / 'TCworkdesk.iconset'),
-         '-o', str(resources / 'TCworkdesk.icns')], timeout=15)
+    run([str(build / 'make-icon'), str(build / 'TCmodeldesk.iconset')], timeout=15)
+    run(['/usr/bin/iconutil', '-c', 'icns', str(build / 'TCmodeldesk.iconset'),
+         '-o', str(resources / 'TCmodeldesk.icns')], timeout=15)
     run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(app)], timeout=120)
     run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(app)], timeout=60)
     print(f'已生成本机签名应用：{app}')

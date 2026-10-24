@@ -62,3 +62,7 @@ The actual temporary-project UI was exercised for cancellation, stale evidence, 
 # Native macOS shell
 
 The desktop distribution reuses this complete UI inside a system WKWebView. An AppKit titled window starts at 1360×900 points with a 760×540 minimum and restores its frame; the existing responsive rules continue to own the inner surface. The app menu provides Data location and migration, Connect existing workbench, and Use independent workbench. Native NSAlert and NSOpenPanel own the data-location explanation and destination picker. Busy/error feedback uses a native spinner and readable message, and migration blocks termination until the operation returns. No new web color, spacing token, animation or general JavaScript-to-shell bridge is added. Closing the window and quitting the shell preserve backend execution ownership.
+
+## TCmodeldesk native lifecycle
+
+The AppKit app keeps regular Dock activation and an NSStatusItem menu while running. Closing its window preserves those visible entrypoints. Explicit quit and installation switching stop only an idle, identity-verified owned backend; active or unknown resources keep the app open with an actionable error. External installations are disconnected without shutdown. Use the existing visual language; current TC / M placeholders need a complete app and template menu-bar icon set.

@@ -31,7 +31,7 @@ def main() -> None:
         sys.path.insert(0, str(control))
     sys.argv = [str(script), *args[1:]]
     if script.name == 'panel_server.py':
-        from desktop.desktop_runtime import serve
+        from desktop.desktop_server import serve
         serve(script)
     else:
         _ = runpy.run_path(str(script), run_name='__main__')

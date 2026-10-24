@@ -8,7 +8,6 @@ import os
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import ClassVar, Literal
@@ -32,7 +31,7 @@ class Preferences(BaseModel):
 
 class Connection(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra='ignore')
-    product: Literal['TCworkdesk'] = 'TCworkdesk'
+    product: Literal['TCmodeldesk', 'TCworkdesk'] = 'TCmodeldesk'
     protocol: Literal[1] = 1
     workspace: str
     url: str
@@ -60,11 +59,19 @@ def atomic_json(path: Path, value: BaseModel) -> None:
 
 
 def default_data_root() -> Path:
-    return Path.home() / 'Library/Application Support/TCworkdesk/Data'
+    return Path.home() / 'Library/Application Support/TCmodeldesk/Data'
 
 
 def data_root(preferences: Path) -> Path:
     if not preferences.exists():
+        support = Path.home() / 'Library/Application Support'
+        if preferences == support / 'TCmodeldesk/desktop.json':
+            legacy = support / 'TCworkdesk/desktop.json'
+            if legacy.exists():
+                return data_root(legacy)
+            legacy_root = support / 'TCworkdesk/Data'
+            if (legacy_root / 'installation/.local-worker/panel_server.py').is_file():
+                return legacy_root
         return default_data_root()
     try:
         value = Preferences.model_validate_json(preferences.read_bytes())
@@ -201,46 +208,19 @@ def migrate(source: Path, destination: Path, preferences: Path) -> None:
             shutil.rmtree(staging)
 
 
-def serve(script: Path) -> None:
-    """Adapt the existing server; native transport adds no model or clock."""
-    sys.path.insert(0, str(script.parent))
-    import panel_server as panel
-    gate = threading.RLock()
-    class DesktopHandler(panel.Handler):
-        closing = False
-
-        def do_POST(self) -> None:
-            with gate:
-                if self.closing:
-                    self.send_json({'error': '工作台正准备迁移，请稍后重新打开'}, 503)
-                    return
-                if self.path == '/api/desktop/shutdown':
-                    try:
-                        self.guard(mutation=True)
-                        if self.headers.get('Content-Length', '0') not in ('0', '2'):
-                            raise ValueError('退出操作不接受额外参数')
-                        if any(row.get('status') == panel.stage_store.GOAL_ACTIVE for row in panel.stage_store.list_goals()):
-                            raise ValueError('仍有启用的目标，请暂停目标后迁移数据')
-                        for goal in panel.stage_store.list_goals():
-                            if goal.get('project') and panel.continuation_clock.snapshot(goal['project'], goal['id']).get('active_intent'):
-                                raise ValueError('原主脑轮次尚未结算，请核对后迁移')
-                        panel.cli_source_idle_guard()
-                        DesktopHandler.closing = True
-                        self.send_json({'ok': True})
-                        threading.Thread(target=self.server.shutdown, daemon=True).start()
-                    except (ValueError, OSError, PermissionError) as error:
-                        self.send_json({'error': str(error)}, 409)
-                    return
-                super().do_POST()
-
-    panel.Handler = DesktopHandler
-    panel.DESKTOP_MANAGED = True
-    panel.main()
-
 
 def stop(connection: Connection) -> None:
     if not connection.managed:
         raise DesktopError('当前连接已有工作台；其数据由原安装管理，不自动迁移或停止')
+    try:
+        process = psutil.Process(connection.pid)
+        if abs(process.create_time() - connection.birth) > .01 or process.status() == psutil.STATUS_ZOMBIE:
+            return
+    except psutil.NoSuchProcess:
+        return
+    live = probe(connection.url, Path(connection.workspace))
+    if live is None or live.pid != connection.pid or live.birth != connection.birth or not live.managed:
+        raise DesktopError('后台身份发生变化，未发送退出请求；请重新连接核对')
     opener = build_opener(ProxyHandler({}), NoRedirect())
     with opener.open(connection.url + '/api/session', timeout=3) as response:
         token = str(json.loads(response.read(8192))['token'])
@@ -249,9 +229,9 @@ def stop(connection: Connection) -> None:
     try:
         with opener.open(request, timeout=5) as response:
             if response.status != 200:
-                raise DesktopError('后台未同意迁移，原数据保持原位')
+                raise DesktopError('后台未同意退出；应用继续保持运行')
     except URLError as error:
-        raise DesktopError('仍有目标、任务或待核对资源；请暂停并处理后迁移') from error
+        raise DesktopError('仍有目标、任务或待核对资源；应用继续运行，请暂停并处理后退出或迁移') from error
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         try:
@@ -266,12 +246,18 @@ def stop(connection: Connection) -> None:
 
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['connect', 'migrate'])
+    parser.add_argument('action', choices=['connect', 'migrate', 'stop'])
     parser.add_argument('--preferences', type=Path, required=True)
     parser.add_argument('--workspace', type=Path)
     parser.add_argument('--destination', type=Path)
+    parser.add_argument('--connection')
     args = parser.parse_args(arguments)
     try:
+        if args.action == 'stop':
+            connection = Connection.model_validate_json(args.connection or '{}')
+            stop(connection)
+            print(connection.model_dump_json())
+            return 0
         root = data_root(args.preferences)
         workspace = args.workspace or initialize(template_root(), root)
         connection = connect(workspace)

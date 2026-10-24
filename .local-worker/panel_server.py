@@ -2446,7 +2446,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/session":
                 return self.send_json({"token": TOKEN})
             if path == '/api/desktop/identity':
-                return self.send_json({'product': 'TCworkdesk', 'protocol': 1,
+                return self.send_json({'product': 'TCmodeldesk', 'protocol': 1,
                     'workspace': str(HERE.parent.resolve()),
                     'url': f'http://127.0.0.1:{self.server.server_port}',
                     'pid': os.getpid(), 'birth': platform_runtime.process_birth(os.getpid()),

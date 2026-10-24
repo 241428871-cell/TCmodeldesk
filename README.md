@@ -1,4 +1,6 @@
-# 多 Agent 协作工作台
+# TCmodeldesk
+
+TCmodeldesk 是基于 [Gambler134201/multi-agent-collaboration](https://github.com/Gambler134201/multi-agent-collaboration) 重构的本地多智能体工作台（原名 TCworkdesk）。本仓库延续 MIT 许可并保留原作者版权声明；由 [241428871-cell](https://github.com/241428871-cell/TCmodeldesk) 维护本次衍生重构，不代表上游官方版本。
 
 **让主脑负责判断，让合适的执行端完成任务。**
 
@@ -36,7 +38,7 @@
 
 本地面板只监听 `127.0.0.1`；配置在本机管理，macOS 密钥使用系统钥匙串引用，任务记录写入各项目自己的 `.model-desk/`。调用云模型时，任务内容仍按所选服务发送。
 
-项目采用 [MIT 许可证](LICENSE)，由 [Gambler134201](https://github.com/Gambler134201) 维护。开发流程见 [Git 工作流](docs/GIT_WORKFLOW.md)，主脑接口见 [通用核心](docs/MAIN_BRAIN_CORE.md)，功能路线见 [后续待更新功能](后续待更新功能/README.md)。
+项目采用 [MIT 许可证](LICENSE)，原项目及原作者见上方引用；本仓库保留其版权与许可。开发流程见 [Git 工作流](docs/GIT_WORKFLOW.md)，主脑接口见 [通用核心](docs/MAIN_BRAIN_CORE.md)，功能路线见 [后续待更新功能](后续待更新功能/README.md)。
 
 ## 支持边界（先读这段）
 
@@ -123,7 +125,7 @@ kill "$(.local-worker/venv/bin/python -c 'import json; print(json.load(open(".lo
 
 ## 目录与内部名称
 
-展示名称是「多agent协作」，但内部标识保持不变以兼容既有实现：MCP 服务名 `model_desk`、UI 资源 `ui://model-desk/workbench-v1`、目录 `.local-worker/`、项目记录目录 `.model-desk/`。
+展示名称是「TCmodeldesk」，但内部标识保持不变以兼容既有实现：MCP 服务名 `model_desk`、UI 资源 `ui://model-desk/workbench-v1`、目录 `.local-worker/`、项目记录目录 `.model-desk/`。
 
 ```
 setup.sh                      macOS 安装脚本（默认只装本目录依赖）
@@ -157,4 +159,4 @@ docs/USAGE.md                 每模型默认 Agent、目标进度、离线与�
 Linux 桌面适配、任意 DSH/Pi 版本兼容、Aider 路径的开箱即用，均不在当前范围内。Windows 兼容代码保留，但不属于当前交付验收。
 # macOS 独立应用
 
-新增 TCworkdesk 原生 `.app` 窗口与安装镜像构建，复用工作台界面，自带 Python／Node 后端。默认应用数据在系统盘用户目录，可从原生菜单选择位置并一键迁移；也能连接已有安装。Codex、DSH、Claude 与账户保持外部适配。使用、构建、迁移范围和验证边界见 [macOS 应用说明](docs/macOS应用.md)。
+新增 TCmodeldesk 原生 `.app` 窗口与安装镜像构建，复用工作台界面，自带 Python／Node 后端。默认应用数据在系统盘用户目录，可从原生菜单选择位置并一键迁移；也能连接已有安装。Codex、DSH、Claude 与账户保持外部适配。使用、构建、迁移范围和验证边界见 [macOS 应用说明](docs/macOS应用.md)。

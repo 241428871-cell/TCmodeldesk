@@ -200,7 +200,7 @@ const viewQuery=new URLSearchParams(window.location.search);
 // It never authorizes a mutation, selects a project or proves an identity.
 const isDshHost=viewQuery.get('host')==='dsh';
 const isDesktopHost=viewQuery.get('host')==='desktop';
-const hostName=()=>isDesktopHost?'TCworkdesk':isDshHost?'DSH':'Codex';
+const hostName=()=>isDesktopHost?'TCmodeldesk':isDshHost?'DSH':'Codex';
 const mainBrainName=()=>isDesktopHost?'项目主脑':isDshHost?'DSH 主脑':'GPT';
 let rememberedPanelView=null;
 // Session storage belongs to this HTTP panel tab, never a global last-project.
@@ -210,7 +210,7 @@ if(!window.modelDeskHost&&!viewQuery.has('project')&&!viewQuery.has('view')){
 }
 let projectView=window.modelDeskInitialView|| (viewQuery.get('project')?{mode:'project',project:viewQuery.get('project')}:viewQuery.get('view')==='all'?{mode:'all',project:null}:rememberedPanelView||{mode:'unbound',project:null});
 if(isDshHost){
-  document.title='模型工作台 · DSH';
+  document.title='TCmodeldesk · DSH';
   const note=$('project-global-note');
   if(note)note.textContent='模型、DSH 登录账户余额与每日预算总账全局共享';
 }
