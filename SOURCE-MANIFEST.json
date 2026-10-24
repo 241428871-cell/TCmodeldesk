@@ -2381,18 +2381,23 @@
     },
     {
       "path": "desktop/build_macos.py",
-      "sha256": "beee7e48ac85de4ed6a11020b5a9c1b6ba75992de550addca8fed3f7ded3533f",
-      "bytes": 6313
+      "sha256": "fe8a27e6c88fb1210d07f8b9a836dc1ddfa3e4a801d9612c8d912eb6b9f2e4c4",
+      "bytes": 6379
     },
     {
       "path": "desktop/desktop_runtime.py",
-      "sha256": "0ec45c175d85fbbfa0cdfd48199affa968d5fd55f6ebcaab812c9b0fe4eccc7f",
-      "bytes": 12636
+      "sha256": "d9e1208e7944bff561f0390d3a4af812849d6d916339b6cecdb00efb27a0f10d",
+      "bytes": 13954
     },
     {
       "path": "desktop/desktop_server.py",
       "sha256": "8ea4887b671b5d38770f5e22eb559af03de1f9d73009d0a383b03bf5d6a8ba11",
       "bytes": 2069
+    },
+    {
+      "path": "desktop/desktop_sources.py",
+      "sha256": "9548fea47fb4c5889b77710a8a7a2062172818f728265cae70611d613e0087d7",
+      "bytes": 5460
     },
     {
       "path": "desktop/macos/Icon.swift",
@@ -2401,7 +2406,7 @@
     },
     {
       "path": "desktop/macos/TCmodeldesk.swift",
-      "sha256": "425d5348afdf80c79e782955078030cd9cede881486112f05c3b3eb04659f76d",
+      "sha256": "7b5bf8cc217b03af78d202af1aae8d615cf37fc950697661379eeae4254cc658",
       "bytes": 24143
     },
     {
@@ -2423,6 +2428,11 @@
       "path": "desktop/tests/test_desktop_runtime.py",
       "sha256": "abe6ef65c7d53a36818a8311fcaa888366de4284a97e4af06fdce145452f5c78",
       "bytes": 6651
+    },
+    {
+      "path": "desktop/tests/test_desktop_sources.py",
+      "sha256": "f82624bca5619f8eb598c6dc19785528310d099dbb9e002f7d98284142514113",
+      "bytes": 3797
     },
     {
       "path": "docs/AGENT_INSTALL.md",
@@ -2506,8 +2516,8 @@
     },
     {
       "path": "docs/macOS应用.md",
-      "sha256": "15eaac0bafe0f56dff4fecc891fab7bd42fd230917970c72ea1f11909c2f9bd1",
-      "bytes": 9319
+      "sha256": "4b9eb4c9a28448b87b10dcf978efd60cceab5ecf4d444bc365be769a27d935bc",
+      "bytes": 10055
     },
     {
       "path": "docs/写回恢复协议.md",
@@ -2561,8 +2571,8 @@
     },
     {
       "path": "docs/重构进度.md",
-      "sha256": "602ee5a3a6001887bac968d34ee9652e6445bc10f57b690227a6bfa868cd1558",
-      "bytes": 182096
+      "sha256": "b6587ef3adcafff1ec7d94ed6170b5a0eefc0075f83cee40fbddf1264440ac4d",
+      "bytes": 185499
     },
     {
       "path": "environment.yml",

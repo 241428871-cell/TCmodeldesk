@@ -68,6 +68,8 @@ def copy_source(destination: Path) -> None:
     for path in (ROOT / 'docs').glob('*.md'):
         if path.name not in local_only:
             shutil.copy2(path, docs / path.name)
+    import desktop_sources
+    desktop_sources.stamp(destination)
 
 
 def main() -> None:
@@ -96,8 +98,8 @@ def main() -> None:
     copy_notices(resources)
     info = {'CFBundleIdentifier': 'local.tcmodeldesk.desktop', 'CFBundleName': 'TCmodeldesk',
         'CFBundleDisplayName': 'TCmodeldesk', 'CFBundleExecutable': 'TCmodeldesk',
-        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.2',
-        'CFBundleVersion': '3', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
+        'CFBundlePackageType': 'APPL', 'CFBundleShortVersionString': '0.3.5',
+        'CFBundleVersion': '6', 'LSMinimumSystemVersion': '13.0', 'NSHighResolutionCapable': True,
         'CFBundleIconFile': 'TCmodeldesk',
         'NSPrincipalClass': 'NSApplication', 'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True}}
     with (contents / 'Info.plist').open('wb') as handle:
